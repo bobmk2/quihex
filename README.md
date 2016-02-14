@@ -7,11 +7,8 @@
 $ npm install -g quivexo
 
 # Setup
-$ quivexo config quiver {quiver-library-file}
-$ quivexo config hexo {hexo-dir}
-$ quivexo notebook-list
-   Name
-----------
+$ quivexo init
+$ quivexo ls-notebook
 📓 MyBlog
 📓 Dialy
 📓 ...

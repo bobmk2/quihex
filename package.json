@@ -1,14 +1,17 @@
 {
-  "name": "quivexo",
+  "name": "quihex",
   "version": "1.0.0",
-  "description": "Support tool for sync blog posts at Hexo.",
-  "main": "index.js",
+  "description": "Support tool for sync blog posts to Hexo that are written by Quiver.",
+  "preferGlobal": true,
+  "bin": {
+    "quihex": "build/index.js"
+  },
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "config": "node build/config.js"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/bobmk2/quivexo"
+    "url": "git+https://github.com/bobmk2/quihex"
   },
   "keywords": [
     "Hexo",
@@ -16,5 +19,22 @@
   ],
   "author": "bobmk2",
   "license": "MIT",
-  "homepage": "https://bitbucket.org/bobmk2/quivexo#readme"
+  "homepage": "https://bitbucket.org/bobmk2/quihex#readme",
+  "devDependencies": {
+    "babel-core": "^6.5.2",
+    "babel-preset-es2015": "^6.5.0",
+    "babel-preset-stage-2": "^6.5.0",
+    "babel-runtime": "^6.5.0",
+    "cli-color": "^1.1.0",
+    "commander": "^2.9.0",
+    "gulp": "^3.9.1",
+    "gulp-babel": "^6.1.2",
+    "gulp-run": "^1.6.12",
+    "home-path": "^1.0.1",
+    "jsonfile": "^2.2.3",
+    "path": "^0.12.7",
+    "path-exists": "^2.1.0",
+    "prompt": "^1.0.0",
+    "run-sequence": "^1.1.5"
+  }
 }
