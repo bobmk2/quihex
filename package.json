@@ -1,13 +1,13 @@
 {
   "name": "quihex",
-  "version": "1.0.0",
+  "version": "0.0.1",
   "description": "Support tool for sync blog posts to Hexo that are written by Quiver.",
   "preferGlobal": true,
   "bin": {
     "quihex": "build/index.js"
   },
   "scripts": {
-    "config": "node build/config.js"
+    "test": "mocha --compilers js:espower-babel/guess test/**/*.js"
   },
   "repository": {
     "type": "git",
@@ -27,13 +27,18 @@
     "babel-runtime": "^6.5.0",
     "cli-color": "^1.1.0",
     "commander": "^2.9.0",
+    "del": "^2.2.0",
+    "espower-babel": "^4.0.1",
     "gulp": "^3.9.1",
     "gulp-babel": "^6.1.2",
     "gulp-run": "^1.6.12",
     "home-path": "^1.0.1",
     "jsonfile": "^2.2.3",
+    "mkdirp": "^0.5.1",
+    "mocha": "^2.4.5",
     "path": "^0.12.7",
     "path-exists": "^2.1.0",
+    "power-assert": "^1.2.0",
     "prompt": "^1.0.0",
     "run-sequence": "^1.1.5"
   }

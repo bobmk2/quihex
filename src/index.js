@@ -3,6 +3,8 @@
 'use strict';
 import command from 'commander';
 import clc from 'cli-color';
+import clct from './utils/cli-color-template';
+import fileUtil from './utils/file-util';
 import prompt from 'prompt';
 import jsonfile from 'jsonfile';
 import pathExists from 'path-exists';
@@ -13,25 +15,19 @@ import fs from 'fs';
 const APP_NAME = 'quihex';
 const CONFIG_FILE_PATH = path.join(getHomePath(), '.quihexrc');
 
-const _success = clc.green;
-const _warn = clc.yellow.bold;
-const _error = clc.red.bold;
-const _notice = clc.blue;
-const _script = clc.bgBlack.xterm(10);
-const _ex = (msg) => { return clc.bgBlack.blackBright(`(ex. ${msg})`); };
+const _ex = (msg) => { return clct.example(`(ex. ${msg})`); };
 
-
-prompt.message = `${_notice('Input')}`;
+prompt.message = `${clct.notice('Input')}`;
 prompt.delimiter = `${clc.white(': ')}`;
 
 function onCancel() {
   console.log('\r\n--------');
-  console.log(_notice('Canceled'));
+  console.log(clct.notice('Canceled'));
   console.log('--------');
 }
 
 function onError(errMsg) {
-  console.log(`${_error('Error')}: ${errMsg}`);
+  console.log(`${clct.error('Error')}: ${errMsg}`);
 }
 
 command
@@ -41,8 +37,8 @@ command
     fetchConfig().then( (result) => {
       if (result.exists) {
         console.log('====================================');
-        console.log(`${_warn('Warning')}: Already exists config file.`);
-        console.log(`${_notice('Tips')}: If you don't update config, Enter ${clc.bold('empty')} with doing nothing.`);
+        console.log(`${clct.warning('Warning')}: Already exists config file.`);
+        console.log(`${clct.notice('Tips')}: If you don't update config, Enter ${clc.bold('empty')} with doing nothing.`);
         console.log('====================================');
       }
       var config = result.config;
@@ -91,8 +87,8 @@ command
           })
           .then( () => {
             console.log('------------------------')
-            console.log(_success('Finished'));
-            console.log(`Change config later > ${_script(`$ vim ~/.quihexrc`)}`);
+            console.log(clct.success('Finished'));
+            console.log(`Change config later > ${clct.script(`$ vim ~/.quihexrc`)}`);
             console.log('------------------------')
           })
           .catch( (err) => {
@@ -123,48 +119,34 @@ command
 
 
 function loadNotebookMeta(qvLibRoot, qvnoteFileName) {
-  return new Promise((resolve, reject) => {
-    jsonfile.readFile(path.join(qvLibRoot, qvnoteFileName, 'meta.json'), (err, obj) => {
-      if (err) {
-        reject(err);
-      }
-      resolve(obj);
-    });
-  });
+  return fileUtil.readJsonFilePromise(path.join(qvLibRoot, qvnoteFileName, 'meta.json'));
 }
 
 function loadConfig() {
   return pathExists(CONFIG_FILE_PATH)
     .then( (result) => {
       if (!result){
-        return Promise.reject(`Config file is not found. Please init > ${_script('$ quihex init')}`);
+        return Promise.reject(`Config file is not found. Please init > ${clct.script('$ quihex init')}`);
       }
-      return new Promise( (resolve, reject) => {
-        jsonfile.readFile(CONFIG_FILE_PATH, (err, obj) => {
-          if (err) {
-            reject(err);
-          }
-          resolve(obj);
-        });
-      });
+      return fileUtil.readJsonFilePromise(CONFIG_FILE_PATH);
     });
 }
 
 function fetchConfig() {
   return pathExists(CONFIG_FILE_PATH)
+    .then( (exists) => {
+      if (!exists) {
+        return Promise.reject('config file is not found');
+      }
+      return fileUtil.readJsonFilePromise(CONFIG_FILE_PATH);
+    })
     .then( (result) => {
-      return new Promise( (resolve, reject) => {
-        if (!result) {
-          resolve({exists: false, config: {}});
-        }
-        jsonfile.readFile(CONFIG_FILE_PATH, (err, obj) => {
-          if (err) {
-            reject(err);
-          }
-          resolve({exists: true, config: obj});
-        });
-      });
-    });
+      return Promise.resolve({exists:true, config: result});
+    })
+    .catch( (err) => {
+      return Promise.resolve({exists:false, config: {}});
+    })
+  ;
 }
 
 function createConfig(hexoPath, quiverLibPath, syncNotebook) {
@@ -232,7 +214,7 @@ function isValidQuiverLibraryFile(qvLibPath){
   return pathExists(qvLibPath)
     .then( (exists) => {
       if (!exists) {
-        return Promise.reject(`the quiver lib file is not found [${qvLibPath}]`);
+        return Promise.reject(`Quiver lib file is not found [${qvLibPath}]`);
       }
       return pathExists(trashNotebook);
     })
