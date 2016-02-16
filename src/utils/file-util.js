@@ -5,7 +5,6 @@ class FileUtil {
     return new Promise( (resolve, reject) => {
       jsonFile.readFile(path, (err, obj) => {
         if (err) {
-          console.log(err.name);
           reject(err);
         }
         resolve(obj);

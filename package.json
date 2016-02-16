@@ -29,6 +29,7 @@
     "commander": "^2.9.0",
     "del": "^2.2.0",
     "espower-babel": "^4.0.1",
+    "fs-sync": "^1.0.2",
     "gulp": "^3.9.1",
     "gulp-babel": "^6.1.2",
     "gulp-run": "^1.6.12",
@@ -40,6 +41,7 @@
     "path-exists": "^2.1.0",
     "power-assert": "^1.2.0",
     "prompt": "^1.0.0",
-    "run-sequence": "^1.1.5"
+    "run-sequence": "^1.1.5",
+    "sinon": "^1.17.3"
   }
 }

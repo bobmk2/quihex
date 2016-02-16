@@ -5,6 +5,7 @@ import command from 'commander';
 import clc from 'cli-color';
 import clct from './utils/cli-color-template';
 import fileUtil from './utils/file-util';
+import quiverUtil from './utils/quiver-util';
 import prompt from 'prompt';
 import jsonfile from 'jsonfile';
 import pathExists from 'path-exists';
@@ -68,10 +69,13 @@ command
 
         isValidHexoDir(hexoPath)
           .then( () => {
-            return isValidQuiverLibraryFile(quiverLibPath)
+            return quiverUtil.isValidQuiverLib(quiverLibPath)
           })
-          .then( () => {
-            return fetchNotebookMetaList(quiverLibPath);
+          .then( (valid) => {
+            if (!valid) {
+              return Promise.reject(new Error(`Quiver lib file path is invalid [${quiverLibPath}]`));
+            }
+            return quiverUtil.getNotebookTitles(config.quiver);
           })
           .then( (result) => {
             console.log('----------');
@@ -105,22 +109,17 @@ command
   .action( () => {
     loadConfig()
       .then( (config) => {
-        return fetchNotebookMetaList(config.quiver);
+        return quiverUtil.getNotebookTitles(config.quiver);
       })
       .then( (result) => {
-        result.map( (file) => {
-          console.log(`📓  ${file.name}`);
+        result.map( (name) => {
+          console.log(`📓  ${name}`);
         });
       })
       .catch( (err) => {
         onError(err);
       });
   });
-
-
-function loadNotebookMeta(qvLibRoot, qvnoteFileName) {
-  return fileUtil.readJsonFilePromise(path.join(qvLibRoot, qvnoteFileName, 'meta.json'));
-}
 
 function loadConfig() {
   return pathExists(CONFIG_FILE_PATH)
@@ -169,58 +168,19 @@ function createConfig(hexoPath, quiverLibPath, syncNotebook) {
   });
 }
 
-function fetchNotebookMetaList(qvLibPath) {
-  return new Promise( (resolve, reject) => {
-      fs.readdir(qvLibPath, (err, files) => {
-        if (err) {
-          reject(err);
-        }
-        resolve(files);
-      })
-    })
-    .then( (files) => {
-      return Promise.all(
-        files.filter( (file) => {
-          var basename = path.basename(file, '.qvnotebook');
-          return basename !== 'Trash' && basename !== 'Inbox';
-        }).map( (file) => {
-          return loadNotebookMeta(qvLibPath, file);
-        })
-      );
-    })
-}
-
 function isValidHexoDir(hexoPath){
   var hexoConfigPath = path.join(hexoPath, '_config.yml');
 
   return pathExists(hexoPath)
     .then( (exists) => {
       if (!exists) {
-        return Promise.reject(`the haxo dir is not found [${hexoPath}]`);
+        return Promise.reject();
       }
       return pathExists(hexoConfigPath);
     })
     .then( (exists) => {
       if (!exists) {
         return Promise.reject(`Hexo config file is not found [${hexoConfigPath}]`);
-      }
-      return Promise.resolve();
-    });
-}
-
-function isValidQuiverLibraryFile(qvLibPath){
-  var trashNotebook = path.join(qvLibPath, 'Trash.qvnotebook');
-
-  return pathExists(qvLibPath)
-    .then( (exists) => {
-      if (!exists) {
-        return Promise.reject(`Quiver lib file is not found [${qvLibPath}]`);
-      }
-      return pathExists(trashNotebook);
-    })
-    .then( (exists) => {
-      if (!exists) {
-        return Promise.reject(`This will be not Quiver Library File [${qvLibPath}]`);
       }
       return Promise.resolve();
     });
