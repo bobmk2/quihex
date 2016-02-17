@@ -30,7 +30,13 @@ class QuiverUtil {
       });
   }
 
-  getNotebookTitles(qvLibPath) {
+  /**
+   * return all notebook meta infomation
+   *
+   * @param qvLibPath
+   * @returns Promise.resolve([{"name":"xxx", "uuid": "yyy"}, ...])
+   */
+  getAllNotebooksMeta(qvLibPath) {
     return new Promise((resolve, reject) => {
       fs.readdir(qvLibPath, (err, files) => {
         if (err) {
@@ -58,12 +64,6 @@ class QuiverUtil {
           }).map((fileName) => {
             return this.loadNotebookMeta(qvLibPath, fileName);
           }));
-      })
-      .then((metaFiles) => {
-        return Promise.resolve(
-          metaFiles.map((meta) => {
-            return meta.name;
-          }).sort());
       });
   }
 
@@ -98,8 +98,8 @@ class QuiverUtil {
       });
   }
 
-  loadNotebookMeta(qvLibPath, notebookName) {
-    return fileUtil.readJsonFilePromise(path.join(qvLibPath, notebookName, 'meta.json'));
+  loadNotebookMeta(qvLibPath, notebookFileName) {
+    return fileUtil.readJsonFilePromise(path.join(qvLibPath, notebookFileName, 'meta.json'));
   }
 
   getNotebookPath(config) {
@@ -112,11 +112,12 @@ class QuiverUtil {
         typeof config.syncNotebook.uuid === 'undefined') {
         reject(`Config file is broken. Please re-init ${clct.script('$ quihex init')}`)
       }
-      resolve(path.join(config.quiver, config.syncNotebook.uuid + '.qvnote'));
+      resolve(path.join(config.quiver, config.syncNotebook.uuid + '.qvnotebook'));
     })
   }
 
   loadNoteFile(notePath) {
+
     var metaPath = path.join(notePath, 'meta.json');
     var contentPath = path.join(notePath, 'content.json');
 
@@ -146,21 +147,30 @@ class QuiverUtil {
       });
   }
 
-  toQuiverObj(notebook) {
+  convertToHexoObj(notebook) {
     return new Promise((resolve, reject) => {
       var title = notebook.meta.title;
       var tags = notebook.meta.tags;
-      var createdAt = notebook.meta.created_at;
-      var updatedAt = notebook.meta.updated_at;
-
-      var contents = notebook.content.cells;
 
       var obj = {};
+      obj.filename = title.split(' ').join('-');
       obj.title = title;
+
+      var cdate = new Date(notebook.meta.created_at * 1000);
+      var toDD = (val) => {
+        return ('0' + val).slice(-2);
+      };
+      obj.date = `${cdate.getFullYear()}-${toDD(cdate.getMonth()+1)}-${toDD(cdate.getDate())} ${toDD(cdate.getHours())}:${toDD(cdate.getMinutes())}:${toDD(cdate.getSeconds())}`;
+
       obj.tags = tags;
-      obj.createdAt = createdAt;
-      obj.updatedAt = updatedAt;
-      obj.contents = contents;
+      obj.content = notebook.content.cells
+        .filter((cell) => {
+          return cell.type === 'markdown';
+        })
+        .map((cell) => {
+          return cell.data;
+        })
+        .join('\n\n');
 
       resolve(obj);
     });

@@ -65,7 +65,7 @@ describe( 'getNotebookPath(config)', () => {
       };
       return quiverUtil.getNotebookPath(data)
         .then((value) => {
-          assert(value === '/Users/me/quiver.qvlibrary/TEST-UUID.qvnote');
+          assert(value === '/Users/me/quiver.qvlibrary/TEST-UUID.qvnotebook');
         });
     })
   });
@@ -130,7 +130,7 @@ describe( 'getNotebookPath(config)', () => {
   });
 });
 
-describe('getNotebookTitles(qvLibPath)', () => {
+describe('getAllNotebooksMeta(qvLibPath)', () => {
   context('when users notebooks exist', () => {
     before( () => {
       mkdir.sync('.tmp/qvlib/123.qvnotebook');
@@ -147,13 +147,13 @@ describe('getNotebookTitles(qvLibPath)', () => {
       stub2.withArgs('.tmp/qvlib', '456.qvnotebook').returns(Promise.resolve(true));
       stub2.withArgs('.tmp/qvlib', '789.qvnotebook').returns(Promise.resolve(true));
     });
-    it ('should get users notebook titles order of alphabet', () => {
-      return quiverUtil.getNotebookTitles('.tmp/qvlib')
+    it ('should get users notebook meta information', () => {
+      return quiverUtil.getAllNotebooksMeta('.tmp/qvlib')
         .then( (result) => {
           assert(result.length === 3);
-          assert(result[0] === 'Alice');
-          assert(result[1] === 'Bob');
-          assert(result[2] === 'Charlie');
+          assert(result[0].name === 'Charlie');
+          assert(result[1].name === 'Bob');
+          assert(result[2].name === 'Alice');
         });
     });
     after( () => {
@@ -176,11 +176,11 @@ describe('getNotebookTitles(qvLibPath)', () => {
       stub2.withArgs('.tmp/qvlib', 'Trash.qvnotebook').returns(Promise.resolve(true));
       stub2.withArgs('.tmp/qvlib', 'Inbox.qvnotebook').returns(Promise.resolve(true));
     });
-    it ('should get only users notebook title', () => {
-      return quiverUtil.getNotebookTitles('.tmp/qvlib')
+    it ('should get only users notebook meta information', () => {
+      return quiverUtil.getAllNotebooksMeta('.tmp/qvlib')
         .then( (result) => {
           assert(result.length === 1);
-          assert(result[0] === 'Test');
+          assert(result[0].name === 'Test');
         });
     });
     after( () => {
@@ -199,7 +199,7 @@ describe('getNotebookTitles(qvLibPath)', () => {
       stub2.withArgs('.tmp/qvlib/', 'Inbox.qvnotebook').returns(Promise.resolve(true));
     });
     it ('should get empty', () => {
-      return quiverUtil.getNotebookTitles('.tmp/qvlib')
+      return quiverUtil.getAllNotebooksMeta('.tmp/qvlib')
         .then( (result) => {
           assert(result.length === 0);
         });
@@ -217,7 +217,7 @@ describe('getNotebookTitles(qvLibPath)', () => {
       stub2.withArgs('.tmp/qvlib/', 'test.dir').returns(Promise.resolve(false));
     });
     it ('should filter it', () => {
-      return quiverUtil.getNotebookTitles('.tmp/qvlib')
+      return quiverUtil.getAllNotebooksMeta('.tmp/qvlib')
         .then( (result) => {
           assert(result.length === 0);
         });
