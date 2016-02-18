@@ -2,6 +2,7 @@ import pathExists from 'path-exists';
 import path from 'path';
 import fs from 'fs';
 import fsSync from 'fs-sync';
+import expandTilde from 'expand-tilde';
 
 import clct from './cli-color-template';
 import fileUtil from './file-util';
@@ -9,10 +10,12 @@ import fileUtil from './file-util';
 class QuiverUtil {
 
   isValidQuiverLib(qvLibPath) {
-    // quiver will have default notebook for trash
-    var trashNotebook = path.join(qvLibPath, 'Trash.qvnotebook');
+    var expandPath = expandTilde(qvLibPath);
 
-    return pathExists(qvLibPath)
+    // quiver will have default notebook for trash
+    var trashNotebook = path.join(expandPath, 'Trash.qvnotebook');
+
+    return pathExists(expandPath)
       .then((exists) => {
         if (!exists) {
           return Promise.reject();

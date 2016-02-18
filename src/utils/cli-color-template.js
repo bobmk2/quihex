@@ -5,6 +5,7 @@ export default {
   warning: clc.yellow.bold,
   error: clc.red.bold,
   notice: clc.blue,
+  question: clc.bgBlack.white,
   script: clc.xterm(10).bgBlack,
   example: clc.bgBlack.blackBright
 }

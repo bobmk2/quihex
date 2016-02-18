@@ -29,6 +29,7 @@
     "commander": "^2.9.0",
     "del": "^2.2.0",
     "espower-babel": "^4.0.1",
+    "expand-tilde": "^1.2.0",
     "fs-sync": "^1.0.2",
     "gulp": "^3.9.1",
     "gulp-babel": "^6.1.2",
