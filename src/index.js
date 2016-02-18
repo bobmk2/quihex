@@ -112,7 +112,7 @@ command
       .then((results) => {
         return Promise.all(
           results.map((newPost) => {
-            var oldPost = newPost.match(/.*\/\.__tmp__\.(.*)$/)[1];
+            var oldPost = newPost.match(/^(.*\/)\.__tmp__\.(.*)$/).slice(1, 3).join('');
             var name = path.basename(oldPost, '.md').split('-').join(' ');
             return pathExists(oldPost)
               .then((exists) => {
@@ -173,7 +173,7 @@ function inputHexoAndQuiverPath(config) {
       message: 'Please input hexo root path. Not found the path or need files.',
       type: 'string',
       required: true,
-      confirm: confirmFuncForHexo
+      conform: confirmFuncForHexo
     },
     {
       name: 'quiver',
@@ -181,7 +181,7 @@ function inputHexoAndQuiverPath(config) {
       default: config ? config.quiver : undefined,
       type: 'string',
       required: true,
-      confirm: confirmFuncForQuiver
+      conform: confirmFuncForQuiver
     }
   ];
 
