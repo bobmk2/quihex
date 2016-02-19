@@ -84,67 +84,23 @@ command
 command
   .command('sync')
   .action(() => {
-    var _config;
     loadConfig()
       .then((config) => {
-        _config = config;
-        return quiverUtil.getNotebookPath(config);
+        return getNotebookFilePaths(config)
+          .then((notebookPaths) => {
+            return convertTempHexoFile(config.hexo, notebookPaths);
+          });
       })
-      .then((notebookPath) => {
-        return fileUtil.getChildrenFilePaths(notebookPath);
+      .then((hexoTempFilePaths) => {
+        return getBlogStatus(hexoTempFilePaths);
       })
-      .then((paths) => {
-        var notePaths = paths.filter((filepath) => {
-          return path.extname(filepath) === '.qvnote'
-        });
-        return Promise.all(
-          notePaths.map((notepath) => {
-            return quiverUtil.loadNoteFile(notepath)
-              .then((note) => {
-                return quiverUtil.convertToHexoObj(note);
-              })
-              .then((hexoObj) => {
-                return hexoUtil.writePost(_config.hexo, hexoObj, true);
-              })
-          })
-        );
-      })
-      .then((results) => {
-        return Promise.all(
-          results.map((newPost) => {
-            var oldPost = newPost.match(/^(.*\/)\.__tmp__\.(.*)$/).slice(1, 3).join('');
-            var name = path.basename(oldPost, '.md').split('-').join(' ');
-            return pathExists(oldPost)
-              .then((exists) => {
-                if (!exists) {
-                  return Promise.resolve({name: name, status: 'create'});
-                }
-                return Promise.all(
-                  [fileUtil.readFilePromise(oldPost), fileUtil.readFilePromise(newPost)]
-                )
-                  .then((results) => {
-                    return Promise.resolve(
-/* ayers rock*/       {name: name, status: results[0] === results[1] ? 'stable' : 'update'}
-                    )});
-              });
-          })
-        );
-      })
-      .then((results) => {
-        results.forEach((result) => {
-          var head = '';
-          switch (result.status) {
-            case 'create' :
-              head = clct.error('CREATE');
-              break;
-            case 'update':
-              head = clct.success('UPDATE');
-              break;
-            case 'stable':
-              head = clct.notice('STABLE');
-              break;
-          }
-          console.log(`[${head}] ${result.name}`);
+      .then((blogStatus) => {
+        blogStatus.forEach((bs) => {
+          var _clc = null;
+          if (bs.status == 'new') {_clc = clct.error;}
+          if (bs.status == 'update') {_clc = clct.success;}
+          if (bs.status == 'stable') {_clc = clct.notice;}
+          console.log(_clc(bs.status.toUpperCase()) + " " + bs.name)
         });
       })
       .catch((err) => {
@@ -291,6 +247,55 @@ function showUserNotebooks(quiver) {
       });
       return Promise.resolve(notebooks);
     });
+}
+
+function getNotebookFilePaths(config) {
+  return quiverUtil.getNotebookPath(config)
+    .then((notebookPath) => {
+      return fileUtil.getChildrenFilePaths(notebookPath);
+    })
+    .then((paths) => {
+      return Promise.resolve(
+        paths.filter((filepath) => {
+          return path.extname(filepath) === '.qvnote'
+        }));
+    });
+}
+
+function convertTempHexoFile(hexoRootPath, notebookPaths) {
+  return Promise.all(
+    notebookPaths.map((notepath) => {
+      return quiverUtil.loadNoteFile(notepath)
+        .then((note) => {
+          return quiverUtil.convertToHexoObj(note);
+        })
+        .then((hexoObj) => {
+          return hexoUtil.writePost(hexoRootPath, hexoObj, true);
+        })
+    }));
+}
+
+function getBlogStatus(hexoTempFilePaths) {
+  return Promise.all(
+    hexoTempFilePaths.map((newPost) => {
+      var oldPost = newPost.match(/^(.*\/)\.__tmp__\.(.*)$/).slice(1, 3).join('');
+      var name = path.basename(oldPost, '.md').split('-').join(' ');
+      return pathExists(oldPost)
+        .then((exists) => {
+          var obj = {name: name};
+          if (!exists) {
+            obj.status = 'new';
+            return Promise.resolve(obj);
+          }
+          return Promise.all(
+            [fileUtil.readFilePromise(oldPost), fileUtil.readFilePromise(newPost)]
+            )
+            .then((results) => {
+              obj.status = results[0] === results[1] ? 'stable' : 'update';
+              return Promise.resolve(obj)
+            });
+        })
+    }));
 }
 
 function inputSyncNotebookName(answers, config) {
