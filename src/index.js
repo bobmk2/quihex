@@ -93,19 +93,23 @@ command
       .then((config) => {
         return getNotebookFilePaths(config)
           .then((notebookPaths) => {
-            return convertTempHexoFile(config.hexo, notebookPaths);
+            return getAllBlogStatus(config, notebookPaths);
           });
       })
-      .then((hexoTempFilePaths) => {
-        return getBlogStatus(hexoTempFilePaths);
-      })
-      .then((blogStatus) => {
-        blogStatus.forEach((bs) => {
-          var _clc = null;
-          if (bs.status == 'new') {_clc = clct.error;}
-          if (bs.status == 'update') {_clc = clct.success;}
-          if (bs.status == 'stable') {_clc = clct.notice;}
-          console.log(_clc(bs.status.toUpperCase()) + " " + bs.name)
+      .then((results) => {
+        // FIXME
+        results.forEach((result) => {
+          var _clc = clct.warning;
+          if (result.status == 'new') {
+            _clc = clct.error;
+          }
+          if (result.status == 'update') {
+            _clc = clct.success;
+          }
+          if (result.status == 'stable') {
+            _clc = clct.notice;
+          }
+          console.log(_clc(result.status.toUpperCase()) + " " + result.hexoObj.filename)
         });
       })
       .catch((err) => {
@@ -257,40 +261,65 @@ function getNotebookFilePaths(config) {
     });
 }
 
-function convertTempHexoFile(hexoRootPath, notebookPaths) {
+function getAllBlogStatus(config, notebookPaths) {
   return Promise.all(
-    notebookPaths.map((notepath) => {
-      return quiverUtil.loadNoteFile(notepath)
-        .then((note) => {
-          return quiverUtil.convertToHexoObj(note);
+    notebookPaths.map((path) => {
+      return quiverUtil.loadNoteFile(path)
+        .then((notebook) => {
+          return quiverUtil.convertToHexoObj(notebook)
         })
         .then((hexoObj) => {
-          return hexoUtil.writePost(hexoRootPath, hexoObj, true);
+          return getBlogStatus(config, hexoObj)
         })
-    }));
+    })
+  );
 }
 
-function getBlogStatus(hexoTempFilePaths) {
-  return Promise.all(
-    hexoTempFilePaths.map((newPost) => {
-      var oldPost = newPost.match(/^(.*\/)\.__tmp__\.(.*)$/).slice(1, 3).join('');
-      var name = path.basename(oldPost, '.md').split('-').join(' ');
-      return pathExists(oldPost)
+function getBlogStatus(config, hexoObj) {
+  return hexoUtil.getHexoConfig(config.hexo)
+    .then((hexoConfig) => {
+
+      var postsRoot = path.join(config.hexo, hexoConfig.source_dir, '_posts');
+      var lastFilePath = path.join(postsRoot, `${hexoObj.filename}.md`);
+      var tempFilePath = path.join(postsRoot, `.__tmp__.${hexoObj.filename}.md`);
+
+      var createStatus = (status) => {
+        return {
+          hexoObj: hexoObj,
+          status: status
+        }
+      }
+
+      // if quihex note has not sync tag, skip sync it.
+      if (hexoObj.tags.filter((tag) => {
+        return (config.tagsForNotSync.indexOf(tag) !== -1);
+      }).length > 0) {
+        return Promise.resolve(createStatus('skip'));
+      }
+
+      return pathExists(lastFilePath)
         .then((exists) => {
-          var obj = {name: name};
           if (!exists) {
-            obj.status = 'new';
-            return Promise.resolve(obj);
+            return Promise.resolve(createStatus('new'));
           }
-          return Promise.all(
-            [fileUtil.readFilePromise(oldPost), fileUtil.readFilePromise(newPost)]
-            )
-            .then((results) => {
-              obj.status = results[0] === results[1] ? 'stable' : 'update';
-              return Promise.resolve(obj)
+          return hexoUtil.writePost(hexoObj, tempFilePath)
+            .then(() => {
+              return isEqualTextOfTwoFiles(lastFilePath, tempFilePath)
+            })
+            .then((isEqual) => {
+              return Promise.resolve(createStatus(isEqual ? 'stable' : 'update'));
             });
         })
-    }));
+    });
+}
+
+function isEqualTextOfTwoFiles(firstFilePath, secondFilePath) {
+  return Promise.all(
+    [fileUtil.readFilePromise(firstFilePath), fileUtil.readFilePromise(secondFilePath)]
+    )
+    .then((results) => {
+      return Promise.resolve(results[0] === results[1]);
+    });
 }
 
 function inputSyncNotebookName(answers, config) {

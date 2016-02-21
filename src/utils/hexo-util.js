@@ -38,36 +38,30 @@ class HexoUtil {
     return obj;
   }
 
-  writePost(hexoRoot, postObj, tmp) {
-    return this.getHexoConfig(hexoRoot)
-      .then((hexoConfig) => {
-        var postsRoot = path.join(hexoRoot, hexoConfig.source_dir, '_posts');
-
-        var toMdText = (postObj) => {
-          var text = [];
-          text.push('----');
-          text.push(`title: ${postObj.title}`);
-          text.push(`date: ${postObj.date}`);
-          text.push('tags:');
-          postObj.tags.forEach((tag) => {
-            text.push(`- ${tag}`);
-          });
-          text.push('----');
-          text.push(postObj.content);
-          return text.join('\n');
-        };
-
-        var filename = `${tmp ? '.__tmp__.' : ''}${postObj.filename}.md` ;
-        var postPath = path.join(postsRoot, filename);
-        return new Promise((resolve, reject) => {
-          fs.writeFile(postPath, toMdText(postObj), 'utf-8', (err, obj) => {
-            if (err) {
-              reject(err);
-            }
-            resolve(postPath);
-          });
-        });
+  writePost(postObj, filePath) {
+    var toMdText = (postObj) => {
+      var text = [];
+      text.push('----');
+      text.push(`title: ${postObj.title}`);
+      text.push(`date: ${postObj.date}`);
+      text.push('tags:');
+      postObj.tags.forEach((tag) => {
+        text.push(`- ${tag}`);
       });
+      text.push('----');
+      text.push(postObj.content);
+      return text.join('\n');
+    };
+
+    var postPath = filePath;
+    return new Promise((resolve, reject) => {
+      fs.writeFile(postPath, toMdText(postObj), 'utf-8', (err, obj) => {
+        if (err) {
+          reject(err);
+        }
+        resolve(postPath);
+      });
+    });
   }
 }
 
