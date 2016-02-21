@@ -11,15 +11,15 @@ import fs from 'fs';
 import fsSync from 'fs-sync';
 import pathExists from 'path-exists';
 
-describe( 'isValidQuiverLibFile(qvLibPath)', () => {
+describe( 'validQuiverLibFile(qvLibPath)', () => {
   context('when lib dir and default notebook exists', () => {
     before( () => {
       mkdir.sync('.tmp/Quiver.qvlibrary/Trash.qvnotebook');
     });
-    it('should is valid', () => {
-      return quiverUtil.isValidQuiverLib('.tmp/Quiver.qvlibrary')
-        .then((valid) => {
-          assert(valid === true);
+    it('should clear valid check', () => {
+      return quiverUtil.validQuiverLib('.tmp/Quiver.qvlibrary')
+        .then(() => {
+          assert(true);
         });
     });
     after( () => {
@@ -30,10 +30,11 @@ describe( 'isValidQuiverLibFile(qvLibPath)', () => {
     before( () => {
       mkdir.sync('.tmp');
     });
-    it('should is invalid', () => {
-      return quiverUtil.isValidQuiverLib('.tmp/Quiver.qvlibrary')
-        .then((valid) => {
-          assert(valid === false);
+    it('should catch error', () => {
+      var qvPath = '.tmp/Quiver.qvlibrary';
+      return quiverUtil.validQuiverLib(qvPath)
+        .catch((err) => {
+          assert(err.message === `Input Quiver library path is not found. > ${qvPath}`);
         })
     });
     after( () => {
@@ -44,10 +45,11 @@ describe( 'isValidQuiverLibFile(qvLibPath)', () => {
     before( () => {
       mkdir.sync('.tmp/Quiver.qvlibrary');
     });
-    it('should is invalid', () => {
-      return quiverUtil.isValidQuiverLib('.tmp/Quiver.qvlibrary')
-        .then((valid) => {
-          assert(valid === false);
+    it('should catch error', () => {
+      var qvPath = '.tmp/Quiver.qvlibrary';
+      return quiverUtil.validQuiverLib(qvPath)
+        .catch((err) => {
+          assert(err.message === `Input Quiver library path will be not quiver library. > ${qvPath}`);
         })
     });
     after( () => {
@@ -71,60 +73,65 @@ describe( 'getNotebookPath(config)', () => {
   });
 
   context( 'when config file is not created', () => {
-    it('should get error message', () => {
+    it('should catch error', () => {
       return quiverUtil.getNotebookPath(undefined)
         .catch((err) => {
-          assert(typeof err === 'string');
+          assert(err.name === 'Error');
+          assert(err.message.startsWith('Config file is broken. Please re-init') === true);
         });
     })
   });
 
   context( 'when quiver field is deleted', () => {
-    it('should get error message', () => {
+    it('should catch error', () => {
       var data = {
         syncNotebook: { name: 'Diary', uuid: 'TEST-UUID' }
       };
       return quiverUtil.getNotebookPath({data})
         .catch((err) => {
-          assert(typeof err === 'string');
+          assert(err.name === 'Error');
+          assert(err.message.startsWith('Config file is broken. Please re-init') === true);
         })
     })
   });
 
   context( 'when syncNotebook field is deleted', () => {
-    it('should get error message', () => {
+    it('should catch error', () => {
       var data = {
         quiver: '/Users/me/quiver.qvlibrary'
       };
       return quiverUtil.getNotebookPath({data})
         .catch((err) => {
-          assert(typeof err === 'string');
+          assert(err.name === 'Error');
+          assert(err.message.startsWith('Config file is broken. Please re-init') === true);
         })
     })
   });
 
   context( 'when syncNotebook.name field is deleted', () => {
-    it('should get error message', () => {
+    it('should catch error', () => {
       var data = {
         quiver: '/Users/me/quiver.qvlibrary',
         syncNotebook: { uuid: 'TEST-UUID' }
       };
       return quiverUtil.getNotebookPath({data})
         .catch((err) => {
-          assert(typeof err === 'string');
+          assert(err.name === 'Error');
+          assert(err.message.startsWith('Config file is broken. Please re-init') === true);
         })
     })
   });
 
   context( 'when syncNotebook.uuid field is deleted', () => {
-    it('should get error message', () => {
+    it('should catch error', () => {
       var data = {
         quiver: '/Users/me/quiver.qvlibrary',
         syncNotebook: { name: 'Diary' }
       };
       return quiverUtil.getNotebookPath({data})
         .catch((err) => {
-          assert(typeof err === 'string');
+          assert(err.name === 'Error');
+          assert(err.message.startsWith('Config file is broken. Please re-init') === true);
         })
     })
   });
@@ -254,10 +261,12 @@ describe('loadNoteFile(notePath)', () => {
       mkdir.sync('.tmp/note');
       jsonFile.writeFileSync('.tmp/note/content.json', {title: 'content'});
     });
-    it ('should read meta and content data', () => {
-      return quiverUtil.loadNoteFile('.tmp/note')
+    it ('should catch error', () => {
+      var metaPath = '.tmp/note';
+      return quiverUtil.loadNoteFile(metaPath)
         .catch( (err) => {
-          assert(typeof err === 'string');
+          assert(err.name === 'Error');
+          assert(err.message === `Notebook meta file is not found [${metaPath+'/meta.json'}]`);
         });
     });
     after( () => {
@@ -268,12 +277,14 @@ describe('loadNoteFile(notePath)', () => {
   context('when content file is not found', () => {
     before( () => {
       mkdir.sync('.tmp/note');
-      jsonFile.writeFileSync('.tmp/note/content.json', {title: 'content'});
+      jsonFile.writeFileSync('.tmp/note/meta.json', {title: 'content'});
     });
     it ('should read meta and content data', () => {
-      return quiverUtil.loadNoteFile('.tmp/note')
+      var metaPath = '.tmp/note';
+      return quiverUtil.loadNoteFile(metaPath)
         .catch( (err) => {
-          assert(typeof err === 'string');
+          assert(err.name === 'Error');
+          assert(err.message === `Notebook content file is not found [${metaPath+'/content.json'}]`);
         });
     });
     after( () => {
@@ -287,45 +298,40 @@ describe('toQuiverObj(notebook)', () => {
     it ('should convert to quiver obj', () => {
       var data = {
         meta: {
-          title: 'test-title',
+          title: 'this is test title',
           tags: ['hexo', 'quiver', 'test'],
           created_at: 1455547707,
           updated_at: 1455548005
         },
         content: {
           cells: [
-            {
-              type: 'markdown',
-              data: 'line-one'
-            },
-            {
-              type: 'markdown',
-              data: 'line-two'
-            }
+            {type: 'markdown', data: 'line-one'},
+            {type: 'markdown', data: 'line-two'}
           ]
         }
       }
-      return quiverUtil.toQuiverObj(data)
+      return quiverUtil.convertToHexoObj(data)
         .then( (result) => {
+          assert(result.filename === 'this-is-test-title')
           assert(result.title === data.meta.title);
+          assert(result.date === '2016-02-15 23:48:27');
           assert(result.tags === data.meta.tags);
-          assert(result.createdAt === data.meta.created_at);
-          assert(result.updatedAt === data.meta.updated_at);
-          assert(result.contents === data.content.cells);
+          assert(result.content === 'line-one\n\nline-two');
         });
     });
   });
   context('when meta and content have another title', () => {
-    it ('should adopt meta title', () => {
+    it ('should adopt title of meta file', () => {
       var data = {
         meta: {
           title: 'test-title'
         },
         content: {
-          title: 'another-title'
+          title: 'another-title',
+          cells: [{type: 'markdown', data: 'line-one'}]
         }
       }
-      return quiverUtil.toQuiverObj(data)
+      return quiverUtil.convertToHexoObj(data)
         .then( (result) => {
           assert(result.title === data.meta.title);
         });
@@ -341,7 +347,7 @@ describe('toQuiverObj(notebook)', () => {
           }]
         }
       }
-      return quiverUtil.toQuiverObj(data)
+      return quiverUtil.convertToHexoObj(data)
         .catch( (err) => {
           assert(err.name === 'TypeError');
         })
@@ -357,7 +363,7 @@ describe('toQuiverObj(notebook)', () => {
           updated_at: 1455548005
         }
       }
-      return quiverUtil.toQuiverObj(data)
+      return quiverUtil.convertToHexoObj(data)
         .catch( (err) => {
           assert(err.name === 'TypeError');
         })
@@ -385,7 +391,7 @@ describe('loadNotebookMeta(qvLibPath, notebookName)', () => {
     it('should return error', () => {
       return quiverUtil.loadNotebookMeta('.tmp/qvlib', '123.qvnotebook')
         .catch( (err) => {
-          assert(typeof err === 'object');
+          assert(err.name === 'Error');
           assert(err.errno === -2);
           assert(err.code === 'ENOENT');
           assert(err.syscall === 'open');

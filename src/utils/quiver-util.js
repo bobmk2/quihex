@@ -9,7 +9,7 @@ import fileUtil from './file-util';
 
 class QuiverUtil {
 
-  isValidQuiverLib(qvLibPath) {
+  validQuiverLib(qvLibPath) {
     var expandPath = expandTilde(qvLibPath);
 
     // quiver will have default notebook for trash
@@ -18,19 +18,16 @@ class QuiverUtil {
     return pathExists(expandPath)
       .then((exists) => {
         if (!exists) {
-          return Promise.reject();
+          return Promise.reject(new Error(`Input Quiver library path is not found. > ${qvLibPath}`));
         }
         return pathExists(trashNotebook);
       })
       .then((exists) => {
         if (!exists) {
-          return Promise.reject();
+          return Promise.reject(new Error(`Input Quiver library path will be not quiver library. > ${qvLibPath}`));
         }
-        return Promise.resolve(true);
+        return Promise.resolve();
       })
-      .catch(() => {
-        return Promise.resolve(false);
-      });
   }
 
   /**
@@ -113,7 +110,7 @@ class QuiverUtil {
         typeof config.syncNotebook === 'undefined' ||
         typeof config.syncNotebook.name === 'undefined' ||
         typeof config.syncNotebook.uuid === 'undefined') {
-        reject(`Config file is broken. Please re-init ${clct.script('$ quihex init')}`)
+        reject(new Error(`Config file is broken. Please re-init ${clct.script('$ quihex init')}`))
       }
       resolve(path.join(config.quiver, config.syncNotebook.uuid + '.qvnotebook'));
     })
@@ -127,13 +124,13 @@ class QuiverUtil {
     return pathExists(metaPath)
       .then((exists) => {
         if (!exists) {
-          return Promise.reject(`Notebook meta file is not found [${metaPath}]`);
+          return Promise.reject(new Error(`Notebook meta file is not found [${metaPath}]`));
         }
         return pathExists(contentPath);
       })
       .then((exists) => {
         if (!exists) {
-          return Promise.reject(`Notebook content file is not found [${metaPath}]`);
+          return Promise.reject(new Error(`Notebook content file is not found [${contentPath}]`));
         }
         return Promise.all(
           [
@@ -151,7 +148,7 @@ class QuiverUtil {
   }
 
   convertToHexoObj(notebook) {
-    return new Promise((resolve, reject) => {
+    return new Promise((resolve) => {
       var title = notebook.meta.title;
       var tags = notebook.meta.tags;
 

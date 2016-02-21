@@ -74,7 +74,12 @@ command
   .action(() => {
     loadConfig()
       .then((config) => {
-        return showUserNotebooks(config.quiver);
+        return getUserNotebookNames(config.quiver);
+      })
+      .then((notebookNames) => {
+        notebookNames.map((nb) => {
+          console.log(`📓  ${nb.name}`);
+        });
       })
       .catch((err) => {
         onError(err);
@@ -119,7 +124,7 @@ function inputHexoAndQuiverPath(config) {
   };
   var confirmFuncForQuiver = (inputValue) => {
     return true;
-  }
+  };
 
   var questions = [
     {
@@ -154,19 +159,16 @@ function inputHexoAndQuiverPath(config) {
   })
     .then((answers) => {
       // FIXME valid check when user inputs value.
-      return isValidHexoAndQuiverPath(answers.hexo, answers.quiver);
+      return validCheckHexoAndQuiverPath(answers.hexo, answers.quiver);
     });
 }
 
-function isValidHexoAndQuiverPath(hexoPath, quiverLibPath) {
+function validCheckHexoAndQuiverPath(hexoPath, quiverLibPath) {
   return isValidHexoDir(hexoPath)
     .then(() => {
-      return quiverUtil.isValidQuiverLib(quiverLibPath)
+      return quiverUtil.validQuiverLib(quiverLibPath)
     })
-    .then((valid) => {
-      if (!valid) {
-        return Promise.reject(new Error(`Quiver lib file path is invalid [${quiverLibPath}]`));
-      }
+    .then(() => {
       return Promise.resolve({hexo: expandTilde(hexoPath), quiver: expandTilde(quiverLibPath)});
     })
 }
@@ -176,7 +178,7 @@ function loadConfig() {
   return pathExists(CONFIG_FILE_PATH)
     .then((result) => {
       if (!result) {
-        return Promise.reject(`Config file is not found. Please init > ${clct.script('$ quihex init')}`);
+        return Promise.reject(new Error(`Config file is not found. Please init > ${clct.script('$ quihex init')}`));
       }
       return fileUtil.readJsonFilePromise(CONFIG_FILE_PATH);
     });
@@ -232,19 +234,12 @@ function isValidHexoDir(hexoPath) {
     });
 }
 
-function showUserNotebooks(quiver) {
+function getUserNotebookNames(quiver) {
   return quiverUtil.getAllNotebooksMeta(quiver)
     .then((notebooks) => {
       if (notebooks.length === 0) {
         return Promise.reject(new Error('Please create one or more your notebooks.'));
       }
-      console.log('-----------------');
-      console.log(' Found Notebooks ');
-      console.log('-----------------');
-
-      notebooks.map((nb) => {
-        console.log(`📓  ${nb.name}`);
-      });
       return Promise.resolve(notebooks);
     });
 }
@@ -299,12 +294,20 @@ function getBlogStatus(hexoTempFilePaths) {
 }
 
 function inputSyncNotebookName(answers, config) {
-  return showUserNotebooks(answers.quiver)
-    .then((notebooks) => {
-      var inputExample = _ex(notebooks[0].name);
+  return getUserNotebookNames(answers.quiver)
+    .then((notebookNames) => {
+      console.log('-----------------');
+      console.log(' Found Notebooks ');
+      console.log('-----------------');
 
-      var confirmFunc = (inputName) => {
-        return notebooks.map((notebook) => {
+      notebookNames.map((nb) => {
+        console.log(`📓  ${nb.name}`);
+      });
+
+      var inputExample = _ex(notebookNames[0].name);
+
+      var conformFunc = (inputName) => {
+        return notebookNames.map((notebook) => {
             return notebook.name;
           }).indexOf(inputName) != -1;
       };
@@ -316,7 +319,7 @@ function inputSyncNotebookName(answers, config) {
         default: config ? config.syncNotebook.name : undefined,
         type: 'string',
         required: true,
-        conform: confirmFunc
+        conform: conformFunc
       }];
 
       return new Promise((resolve, reject) => {
@@ -331,10 +334,10 @@ function inputSyncNotebookName(answers, config) {
           }
 
           // return selected notebook
-          var selectedIdx = notebooks.map((nb)=> {
+          var selectedIdx = notebookNames.map((nb)=> {
             return nb.name;
           }).indexOf(result.syncNotebook);
-          resolve(notebooks[selectedIdx]);
+          resolve(notebookNames[selectedIdx]);
         });
       });
     });
