@@ -58,7 +58,7 @@ describe( 'validQuiverLibFile(qvLibPath)', () => {
   });
 });
 
-describe( 'getNotebookPath(config)', () => {
+describe( 'getSyncNotebookPath(config)', () => {
   context( 'when config has necessary fields', () => {
     it ('should get notebook path', () => {
       var data = {
@@ -137,7 +137,7 @@ describe( 'getNotebookPath(config)', () => {
   });
 });
 
-describe('getAllNotebooksMeta(qvLibPath)', () => {
+describe('getAllNotebookMetaFiles(qvLibPath)', () => {
   context('when users notebooks exist', () => {
     before( () => {
       mkdir.sync('.tmp/qvlib/123.qvnotebook');
@@ -149,13 +149,13 @@ describe('getAllNotebooksMeta(qvLibPath)', () => {
       stub.withArgs('.tmp/qvlib','456.qvnotebook').returns({name:'Bob'});
       stub.withArgs('.tmp/qvlib','789.qvnotebook').returns({name:'Alice'});
 
-      let stub2 = sinon.stub(quiverUtil, 'isValidNotebook');
+      let stub2 = sinon.stub(quiverUtil, 'validNotebook');
       stub2.withArgs('.tmp/qvlib', '123.qvnotebook').returns(Promise.resolve(true));
       stub2.withArgs('.tmp/qvlib', '456.qvnotebook').returns(Promise.resolve(true));
       stub2.withArgs('.tmp/qvlib', '789.qvnotebook').returns(Promise.resolve(true));
     });
     it ('should get users notebook meta information', () => {
-      return quiverUtil.getAllNotebooksMeta('.tmp/qvlib')
+      return quiverUtil.getAllNotebookMetaFiles('.tmp/qvlib')
         .then( (result) => {
           assert(result.length === 3);
           assert(result[0].name === 'Charlie');
@@ -166,7 +166,7 @@ describe('getAllNotebooksMeta(qvLibPath)', () => {
     after( () => {
       del.sync('.tmp');
       quiverUtil.loadNotebookMeta.restore();
-      quiverUtil.isValidNotebook.restore();
+      quiverUtil.validNotebook.restore();
     });
   });
   context('when users and default notebooks exist', () => {
@@ -178,13 +178,13 @@ describe('getAllNotebooksMeta(qvLibPath)', () => {
       let stub = sinon.stub(quiverUtil, 'loadNotebookMeta');
       stub.withArgs('.tmp/qvlib','123.qvnotebook').returns({name:'Test'});
 
-      let stub2 = sinon.stub(quiverUtil, 'isValidNotebook');
+      let stub2 = sinon.stub(quiverUtil, 'validNotebook');
       stub2.withArgs('.tmp/qvlib', '123.qvnotebook').returns(Promise.resolve(true));
       stub2.withArgs('.tmp/qvlib', 'Trash.qvnotebook').returns(Promise.resolve(true));
       stub2.withArgs('.tmp/qvlib', 'Inbox.qvnotebook').returns(Promise.resolve(true));
     });
     it ('should get only users notebook meta information', () => {
-      return quiverUtil.getAllNotebooksMeta('.tmp/qvlib')
+      return quiverUtil.getAllNotebookMetaFiles('.tmp/qvlib')
         .then( (result) => {
           assert(result.length === 1);
           assert(result[0].name === 'Test');
@@ -193,7 +193,7 @@ describe('getAllNotebooksMeta(qvLibPath)', () => {
     after( () => {
       del.sync('.tmp');
       quiverUtil.loadNotebookMeta.restore();
-      quiverUtil.isValidNotebook.restore();
+      quiverUtil.validNotebook.restore();
     });
   });
   context('when only default notebooks exist', () => {
@@ -201,37 +201,37 @@ describe('getAllNotebooksMeta(qvLibPath)', () => {
       mkdir.sync('.tmp/qvlib/Trash.qvnotebook');
       mkdir.sync('.tmp/qvlib/Inbox.qvnotebook');
 
-      let stub2 = sinon.stub(quiverUtil, 'isValidNotebook');
+      let stub2 = sinon.stub(quiverUtil, 'validNotebook');
       stub2.withArgs('.tmp/qvlib/', 'Trash.qvnotebook').returns(Promise.resolve(true));
       stub2.withArgs('.tmp/qvlib/', 'Inbox.qvnotebook').returns(Promise.resolve(true));
     });
     it ('should get empty', () => {
-      return quiverUtil.getAllNotebooksMeta('.tmp/qvlib')
+      return quiverUtil.getAllNotebookMetaFiles('.tmp/qvlib')
         .then( (result) => {
           assert(result.length === 0);
         });
     });
     after( () => {
       del.sync('.tmp');
-      quiverUtil.isValidNotebook.restore();
+      quiverUtil.validNotebook.restore();
     });
   });
   context('when invalid notebook exists', () => {
     before( () => {
       mkdir.sync('.tmp/qvlib/test.dir');
 
-      let stub2 = sinon.stub(quiverUtil, 'isValidNotebook');
+      let stub2 = sinon.stub(quiverUtil, 'validNotebook');
       stub2.withArgs('.tmp/qvlib/', 'test.dir').returns(Promise.resolve(false));
     });
     it ('should filter it', () => {
-      return quiverUtil.getAllNotebooksMeta('.tmp/qvlib')
+      return quiverUtil.getAllNotebookMetaFiles('.tmp/qvlib')
         .then( (result) => {
           assert(result.length === 0);
         });
     });
     after( () => {
       del.sync('.tmp');
-      quiverUtil.isValidNotebook.restore();
+      quiverUtil.validNotebook.restore();
     });
   });
 });
@@ -310,7 +310,7 @@ describe('toQuiverObj(notebook)', () => {
           ]
         }
       }
-      return quiverUtil.convertToHexoObj(data)
+      return quiverUtil.convertToHexoPostObj(data)
         .then( (result) => {
           assert(result.filename === 'this-is-test-title')
           assert(result.title === data.meta.title);
@@ -331,7 +331,7 @@ describe('toQuiverObj(notebook)', () => {
           cells: [{type: 'markdown', data: 'line-one'}]
         }
       }
-      return quiverUtil.convertToHexoObj(data)
+      return quiverUtil.convertToHexoPostObj(data)
         .then( (result) => {
           assert(result.title === data.meta.title);
         });
@@ -347,7 +347,7 @@ describe('toQuiverObj(notebook)', () => {
           }]
         }
       }
-      return quiverUtil.convertToHexoObj(data)
+      return quiverUtil.convertToHexoPostObj(data)
         .catch( (err) => {
           assert(err.name === 'TypeError');
         })
@@ -363,7 +363,7 @@ describe('toQuiverObj(notebook)', () => {
           updated_at: 1455548005
         }
       }
-      return quiverUtil.convertToHexoObj(data)
+      return quiverUtil.convertToHexoPostObj(data)
         .catch( (err) => {
           assert(err.name === 'TypeError');
         })
@@ -401,14 +401,14 @@ describe('loadNotebookMeta(qvLibPath, notebookName)', () => {
   });
 });
 
-describe('isValidNotebook(qvLibPath, notebookDirName)', () => {
+describe('validNotebook(qvLibPath, notebookDirName)', () => {
   context('when notebook has meta.json', () => {
     before( () => {
       mkdir.sync('.tmp/qvlib/Test.qvnotebook');
       jsonFile.writeFileSync('.tmp/qvlib/Test.qvnotebook/meta.json', {name:'test'});
     });
     it('should is valid', () => {
-      return quiverUtil.isValidNotebook('.tmp/qvlib', 'Test.qvnotebook')
+      return quiverUtil.validNotebook('.tmp/qvlib', 'Test.qvnotebook')
         .then((valid) => {
           assert(valid === true);
         });
@@ -422,7 +422,7 @@ describe('isValidNotebook(qvLibPath, notebookDirName)', () => {
       mkdir.sync('.tmp/qvlib/Testtt.qbnotebook');
     });
     it('should is invalid', () => {
-      return quiverUtil.isValidNotebook('.tmp/qvlib', 'Test.qbnotebook')
+      return quiverUtil.validNotebook('.tmp/qvlib', 'Test.qbnotebook')
         .then((valid) => {
           assert(valid === false);
         });
@@ -437,7 +437,7 @@ describe('isValidNotebook(qvLibPath, notebookDirName)', () => {
     });
     it('should is invalid', () => {
       var spy = sinon.spy(path, 'extname');
-      return quiverUtil.isValidNotebook('.tmp/qvlib', 'Test.qbnotebook')
+      return quiverUtil.validNotebook('.tmp/qvlib', 'Test.qbnotebook')
         .then((valid) => {
           assert(spy.calledOnce);
           assert(valid === false);
@@ -454,7 +454,7 @@ describe('isValidNotebook(qvLibPath, notebookDirName)', () => {
     });
     it('should is invalid', () => {
       var spy = sinon.spy(fsSync, 'isDir');
-      return quiverUtil.isValidNotebook('.tmp/qvlib', 'Test.qvnotebook')
+      return quiverUtil.validNotebook('.tmp/qvlib', 'Test.qvnotebook')
         .then((valid) => {
           assert(spy.calledOnce);
           assert(valid === false);
@@ -469,7 +469,7 @@ describe('isValidNotebook(qvLibPath, notebookDirName)', () => {
       mkdir.sync('.tmp/qvlib/Test.qvnotebook');
     });
     it('should is invalid', () => {
-      return quiverUtil.isValidNotebook('.tmp/qvlib', 'Test.qvnotebook')
+      return quiverUtil.validNotebook('.tmp/qvlib', 'Test.qvnotebook')
         .then((valid) => {
           assert(valid === false);
         });

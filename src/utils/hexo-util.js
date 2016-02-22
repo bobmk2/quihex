@@ -1,18 +1,15 @@
 import yaml from 'js-yaml';
-import fs from 'fs';
 import path from 'path';
+import fileUtil from './file-util'
+
+import expandTilde from 'expand-tilde'
+import pathExists from 'path-exists'
 
 class HexoUtil {
-  getHexoConfig(hexoRoot) {
-    return new Promise((resolve, reject) => {
-      var confPath = path.join(hexoRoot,'_config.yml');
-      fs.readFile(confPath, 'utf-8', (err, obj) => {
-        if (err) {
-          reject(err);
-        }
-        resolve(obj);
-      });
-    })
+  loadHexoConfig(hexoRoot) {
+    var confPath = path.join(hexoRoot,'_config.yml');
+
+    return fileUtil.readFilePromise(confPath)
       .then((file) => {
         var ymlobj = yaml.safeLoad(file);
 
@@ -26,43 +23,42 @@ class HexoUtil {
       })
   }
 
-  toMarkdownPost(base) {
-    var obj = {};
-    obj.filename = base.title.split(' ').join('-');
+  validHexoRoot(hexoRootPath) {
+    var expandPath = expandTilde(hexoRootPath);
 
-    obj.title = base.title;
-    obj.date = '';
-    obj.tags = base.tags;
-    obj.content = base.content;
+    // there is _config.yml in hexo root
+    var hexoConfigPath = path.join(expandPath, '_config.yml');
 
-    return obj;
-  }
-
-  writePost(postObj, filePath) {
-    var toMdText = (postObj) => {
-      var text = [];
-      text.push('----');
-      text.push(`title: ${postObj.title}`);
-      text.push(`date: ${postObj.date}`);
-      text.push('tags:');
-      postObj.tags.forEach((tag) => {
-        text.push(`- ${tag}`);
-      });
-      text.push('----');
-      text.push(postObj.content);
-      return text.join('\n');
-    };
-
-    var postPath = filePath;
-    return new Promise((resolve, reject) => {
-      fs.writeFile(postPath, toMdText(postObj), 'utf-8', (err, obj) => {
-        if (err) {
-          reject(err);
+    return pathExists(expandPath)
+      .then((exists) => {
+        if (!exists) {
+          return Promise.reject(new Error(`Input hexo root path is not found. [${hexoRootPath}]`));
         }
-        resolve(postPath);
+        return pathExists(expandTilde(hexoConfigPath));
+      })
+      .then((exists) => {
+        if (!exists) {
+          return Promise.reject(new Error(`Input hexo root path will be not hexo root.(Needs _config.yml) [${hexoRootPath}]`));
+        }
+
+        return Promise.resolve();
       });
-    });
   }
+
+  toHexoPostString(hexoPostObj) {
+    var text = [];
+    text.push('----');
+    text.push(`title: ${hexoPostObj.title}`);
+    text.push(`date: ${hexoPostObj.date}`);
+    text.push('tags:');
+    hexoPostObj.tags.forEach((tag) => {
+      text.push(`- ${tag}`);
+    });
+    text.push('----');
+    text.push(hexoPostObj.content);
+    return text.join('\n');
+  }
+
 }
 
 export default new HexoUtil();

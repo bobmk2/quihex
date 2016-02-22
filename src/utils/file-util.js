@@ -4,7 +4,7 @@ import path from 'path';
 
 class FileUtil {
   readJsonFilePromise(path) {
-    return new Promise( (resolve, reject) => {
+    return new Promise((resolve, reject) => {
       jsonFile.readFile(path, (err, obj) => {
         if (err) {
           reject(err);
@@ -25,13 +25,26 @@ class FileUtil {
     });
   }
 
-  getChildrenFilePaths(rootPath) {
-    return this.readDir(rootPath)
-      .then((files) => {
-        var paths = files.map((file)=> {
-          return path.join(rootPath, file);
-        });
-        return Promise.resolve(paths);
+  writeFilePromise(path, text, encoding) {
+    return new Promise((resolve, reject) => {
+      fs.writeFile(path, text, encoding, (err) => {
+        if (err) {
+          reject(err);
+        }
+        resolve(path);
+      });
+    });
+  }
+
+  isEqualTextOfTwoFiles(firstFilePath, secondFilePath) {
+    return Promise.all(
+      [
+        this.readFilePromise(firstFilePath),
+        this.readFilePromise(secondFilePath)
+      ]
+      )
+      .then((results) => {
+        return Promise.resolve(results[0] === results[1]);
       });
   }
 

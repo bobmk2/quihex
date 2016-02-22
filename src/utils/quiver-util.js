@@ -4,7 +4,6 @@ import fs from 'fs';
 import fsSync from 'fs-sync';
 import expandTilde from 'expand-tilde';
 
-import clct from './cli-color-template';
 import fileUtil from './file-util';
 
 class QuiverUtil {
@@ -18,16 +17,32 @@ class QuiverUtil {
     return pathExists(expandPath)
       .then((exists) => {
         if (!exists) {
-          return Promise.reject(new Error(`Input Quiver library path is not found. > ${qvLibPath}`));
+          return Promise.reject(new Error(`Input Quiver library path is not found. [${qvLibPath}]`));
         }
         return pathExists(trashNotebook);
       })
       .then((exists) => {
         if (!exists) {
-          return Promise.reject(new Error(`Input Quiver library path will be not quiver library. > ${qvLibPath}`));
+          return Promise.reject(new Error(`Input Quiver library path will be not quiver library.(Needs Trash.qvnotebook) [${qvLibPath}]`));
         }
         return Promise.resolve();
       })
+  }
+
+  getNotePaths(notebookPath) {
+    return fileUtil.readDir(notebookPath)
+      .then((files) => {
+        var paths = files.map((file)=> {
+          return path.join(notebookPath, file);
+        });
+        return Promise.resolve(paths);
+      })
+      .then((paths) => {
+        return Promise.resolve(
+          paths.filter((filepath) => {
+            return path.extname(filepath) === '.qvnote'
+          }));
+      });
   }
 
   /**
@@ -36,7 +51,7 @@ class QuiverUtil {
    * @param qvLibPath
    * @returns Promise.resolve([{"name":"xxx", "uuid": "yyy"}, ...])
    */
-  getAllNotebooksMeta(qvLibPath) {
+  getAllNotebookMetaFiles(qvLibPath) {
     return new Promise((resolve, reject) => {
       fs.readdir(qvLibPath, (err, files) => {
         if (err) {
@@ -48,7 +63,7 @@ class QuiverUtil {
       .then((files) => {
         return Promise.all(
           files.map((file) => {
-            return this.isValidNotebook(qvLibPath, file);
+            return this._validNotebook(qvLibPath, file);
           })
         ).then((results) => {
           return files.filter((file, idx) => {
@@ -67,7 +82,7 @@ class QuiverUtil {
       });
   }
 
-  isValidNotebook(qvLibPath, notebookDirName) {
+  _validNotebook(qvLibPath, notebookDirName) {
     return pathExists(path.join(qvLibPath, notebookDirName))
       .then((exists) => {
         if (!exists) {
@@ -102,20 +117,6 @@ class QuiverUtil {
     return fileUtil.readJsonFilePromise(path.join(qvLibPath, notebookFileName, 'meta.json'));
   }
 
-  getNotebookPath(config) {
-    return new Promise((resolve, reject) => {
-      if (
-        typeof config === 'undefined' ||
-        typeof config.quiver === 'undefined' ||
-        typeof config.syncNotebook === 'undefined' ||
-        typeof config.syncNotebook.name === 'undefined' ||
-        typeof config.syncNotebook.uuid === 'undefined') {
-        reject(new Error(`Config file is broken. Please re-init ${clct.script('$ quihex init')}`))
-      }
-      resolve(path.join(config.quiver, config.syncNotebook.uuid + '.qvnotebook'));
-    })
-  }
-
   loadNoteFile(notePath) {
 
     var metaPath = path.join(notePath, 'meta.json');
@@ -147,23 +148,23 @@ class QuiverUtil {
       });
   }
 
-  convertToHexoObj(notebook) {
+  convertToHexoPostObj(notebookObj) {
     return new Promise((resolve) => {
-      var title = notebook.meta.title;
-      var tags = notebook.meta.tags;
+      var title = notebookObj.meta.title;
+      var tags = notebookObj.meta.tags;
 
       var obj = {};
       obj.filename = title.split(' ').join('-');
       obj.title = title;
 
-      var cdate = new Date(notebook.meta.created_at * 1000);
+      var cdate = new Date(notebookObj.meta.created_at * 1000);
       var toDD = (val) => {
         return ('0' + val).slice(-2);
       };
       obj.date = `${cdate.getFullYear()}-${toDD(cdate.getMonth()+1)}-${toDD(cdate.getDate())} ${toDD(cdate.getHours())}:${toDD(cdate.getMinutes())}:${toDD(cdate.getSeconds())}`;
 
       obj.tags = tags;
-      obj.content = notebook.content.cells
+      obj.content = notebookObj.content.cells
         .filter((cell) => {
           return cell.type === 'markdown';
         })
