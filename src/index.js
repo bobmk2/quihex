@@ -134,7 +134,7 @@ command
             return (yesOpt ? Promise.resolve(true) : inputYesNoConform('Do you sync quiver notes to hexo posts?'))
               .then((inputYes) => {
                 if (!inputYes) {
-                  console.log(`${clct.notice('Canceled')}: quiver notes are not synced.`);
+                  console.log(`${clct.notice('Canceled')}: Quiver notes are not synced.`);
                   return;
                 }
                 console.log(`${clct.notice('Info')}: Sync start...`);
@@ -145,7 +145,7 @@ command
                 )
                   .then((results) => {
                     console.log('----------------------------------------');
-                    console.log(`${clct.success('Finished')}: sync succeed`);
+                    console.log(`${clct.success('Finished')}: Sync succeed`);
                     console.log(`${clct.notice('Info')}: Check updated texts at hexo dir, and deploy them :)`)
                     console.log('----------------------------------------');
                   });

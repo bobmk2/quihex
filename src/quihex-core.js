@@ -1,5 +1,5 @@
 import path from 'path'
-import pathExists from 'path-exists'
+import pathExists from 'path-exists';
 
 import quiverUtil from './utils/quiver-util'
 import fileUtil from './utils/file-util'
@@ -68,17 +68,16 @@ class QuihexCore {
         var postsRoot = path.join(config.hexo, hexoConfig.source_dir, '_posts');
         var filePath = path.join(postsRoot, `${hexoPostObj.filename}.md`);
 
-        return this._writeHexoPost(hexoPostObj, filePath);
+        return fileUtil.writeFilePromise(filePath, hexoUtil.toHexoPostString(hexoPostObj), 'utf-8');
       });
   }
 
-  _getBlogStatus(config, hexoPostObj) {
-    return hexoUtil.loadHexoConfig(config.hexo)
+  _getBlogStatus(quihexConfig, hexoPostObj) {
+    return hexoUtil.loadHexoConfig(quihexConfig.hexo)
       .then((hexoConfig) => {
 
-        var postsRoot = path.join(config.hexo, hexoConfig.source_dir, '_posts');
+        var postsRoot = path.join(quihexConfig.hexo, hexoConfig.source_dir, '_posts');
         var lastFilePath = path.join(postsRoot, `${hexoPostObj.filename}.md`);
-        var tempFilePath = path.join(postsRoot, `.__tmp__.${hexoPostObj.filename}.md`);
 
         var createStatus = (status) => {
           return {
@@ -89,29 +88,26 @@ class QuihexCore {
 
         // if quihex note has not sync tag, skip sync it.
         if (hexoPostObj.tags.filter((tag) => {
-            return (config.tagsForNotSync.indexOf(tag) !== -1);
+            return (quihexConfig.tagsForNotSync.indexOf(tag) !== -1);
           }).length > 0) {
           return Promise.resolve(createStatus('skip'));
         }
 
         return pathExists(lastFilePath)
           .then((exists) => {
+
+            // it is new if last file is not found
             if (!exists) {
               return Promise.resolve(createStatus('new'));
             }
-            return this._writeHexoPost(hexoPostObj, tempFilePath)
-              .then(() => {
-                return fileUtil.isEqualTextOfTwoFiles(lastFilePath, tempFilePath)
-              })
-              .then((isEqual) => {
+
+            return fileUtil.readFilePromise(lastFilePath)
+              .then((lastPosts) => {
+                var isEqual = lastPosts === hexoUtil.toHexoPostString(hexoPostObj);
                 return Promise.resolve(createStatus(isEqual ? 'stable' : 'update'));
               });
           })
       });
-  }
-
-  _writeHexoPost(postObj, postPath) {
-    return fileUtil.writeFilePromise(postPath, hexoUtil.toHexoPostString(postObj), 'utf-8');
   }
 }
 
