@@ -19,6 +19,10 @@ class HexoUtil {
         config.date_format = ymlobj.date_format;
         config.time_format = ymlobj.time_format;
 
+        if (!config.source_dir || !config.date_format || !config.time_format) {
+          return Promise.reject(new Error(`Hexo config file is not valid. [${path.join(hexoRoot, '_config.yml')}]`));
+        }
+
         return Promise.resolve(config);
       })
   }
@@ -50,7 +54,7 @@ class HexoUtil {
     text.push('----');
     text.push(`title: ${hexoPostObj.title}`);
     text.push(`date: ${hexoPostObj.date}`);
-    text.push('tags:');
+    text.push('tags: ');
     hexoPostObj.tags.forEach((tag) => {
       text.push(`- ${tag}`);
     });

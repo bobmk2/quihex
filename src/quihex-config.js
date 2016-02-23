@@ -5,12 +5,10 @@ import jsonFile from 'jsonfile';
 
 import fileUtil from './utils/file-util'
 
-const CONFIG_FILE_PATH = path.join(getHomePath(), '.quihexrc');
-
 class QuihexConfig {
 
   getConfigFilePath() {
-    return CONFIG_FILE_PATH;
+    return path.join(getHomePath(), '.quihexrc');
   }
 
   _validQuihexConfig(config) {
@@ -21,20 +19,22 @@ class QuihexConfig {
         typeof config.quiver === 'undefined' ||
         typeof config.syncNotebook === 'undefined' ||
         typeof config.syncNotebook.name === 'undefined' ||
-        typeof config.syncNotebook.uuid === 'undefined') {
-        reject(new Error(`Config file is broken. Please remove config file > '$ rm ${CONFIG_FILE_PATH}', and re-init > '$ quihex init'`))
+        typeof config.syncNotebook.uuid === 'undefined' ||
+        typeof config.tagsForNotSync === 'undefined'
+      ) {
+        reject(new Error(`Config file is broken. Please remove config file > '$ rm ${this.getConfigFilePath()}', and re-init > '$ quihex init'`))
       }
       resolve(config);
     })
   }
 
   loadConfig() {
-    return pathExists(CONFIG_FILE_PATH)
+    return pathExists(this.getConfigFilePath())
       .then((result) => {
         if (!result) {
           return Promise.reject(new Error(`Config file is not found. Please init > '$ quihex init'`));
         }
-        return fileUtil.readJsonFilePromise(CONFIG_FILE_PATH);
+        return fileUtil.readJsonFilePromise(this.getConfigFilePath());
       })
       .then((config) => {
         return this._validQuihexConfig(config);
@@ -54,7 +54,7 @@ class QuihexConfig {
 
   writeConfig(configObj) {
     return new Promise((resolve, reject) => {
-      jsonFile.writeFile(CONFIG_FILE_PATH, configObj, {spaces: 2}, (err) => {
+      jsonFile.writeFile(this.getConfigFilePath(), configObj, {spaces: 2}, (err) => {
         if (err) {reject(err);}
         resolve();
       });

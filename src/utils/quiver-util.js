@@ -46,10 +46,7 @@ class QuiverUtil {
   }
 
   /**
-   * return all notebook meta infomation
-   *
-   * @param qvLibPath
-   * @returns Promise.resolve([{"name":"xxx", "uuid": "yyy"}, ...])
+   * return all notebook meta file
    */
   getAllNotebookMetaFiles(qvLibPath) {
     return new Promise((resolve, reject) => {
@@ -61,6 +58,7 @@ class QuiverUtil {
       })
     })
       .then((files) => {
+        // filter un-notebook files
         return Promise.all(
           files.map((file) => {
             return this._validNotebook(qvLibPath, file);

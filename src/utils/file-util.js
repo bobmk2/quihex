@@ -2,6 +2,9 @@ import jsonFile from 'jsonfile';
 import fs from 'fs';
 import path from 'path';
 
+/**
+ * Wrapper fs for promise
+ */
 class FileUtil {
   readJsonFilePromise(path) {
     return new Promise((resolve, reject) => {

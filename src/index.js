@@ -167,7 +167,7 @@ function inputHexoRootPath(config) {
     default: config ? config.hexo : undefined,
     message: 'Please input hexo root path',
     type: 'string',
-    required: true,
+    required: true
   };
 
   return input(question)

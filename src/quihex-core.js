@@ -25,7 +25,7 @@ class QuihexCore {
         if (notebooks.length === 0) {
           return Promise.reject(new Error('Please create one or more your notebooks.'));
         }
-        return Promise.resolve(notebooks);
+        return Promise.resolve(notebooks.map((notebooks) => notebooks.name));
       });
   }
 
