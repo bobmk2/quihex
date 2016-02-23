@@ -62,6 +62,16 @@ class QuihexCore {
     );
   }
 
+  writeAsHexoPosts(config, hexoPostObj) {
+    return hexoUtil.loadHexoConfig(config.hexo)
+      .then((hexoConfig) => {
+        var postsRoot = path.join(config.hexo, hexoConfig.source_dir, '_posts');
+        var filePath = path.join(postsRoot, `${hexoPostObj.filename}.md`);
+
+        return this._writeHexoPost(hexoPostObj, filePath);
+      });
+  }
+
   _getBlogStatus(config, hexoPostObj) {
     return hexoUtil.loadHexoConfig(config.hexo)
       .then((hexoConfig) => {

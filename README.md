@@ -47,6 +47,8 @@ $ rm ~/.quihexrc
 
 ### TODO
 * Setting tags for not sync on cli
+* Track changed blog title
+  * Now, quihex deals with another posts.
 
 ### License
 

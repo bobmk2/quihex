@@ -54,7 +54,7 @@ class HexoUtil {
     text.push('----');
     text.push(`title: ${hexoPostObj.title}`);
     text.push(`date: ${hexoPostObj.date}`);
-    text.push('tags: ');
+    text.push('tags:');
     hexoPostObj.tags.forEach((tag) => {
       text.push(`- ${tag}`);
     });

@@ -147,7 +147,7 @@ describe(('HexoUtil'), () => {
           var texts = str.split('\n');
           assert(texts[1] === 'title: test');
           assert(texts[2] === 'date: sampledate');
-          assert(texts[3] === 'tags: ');
+          assert(texts[3] === 'tags:');
           assert(texts[5] === 'sampletext');
         });
       });
@@ -162,7 +162,7 @@ describe(('HexoUtil'), () => {
           var texts = str.split('\n');
           assert(texts[1] === 'title: test');
           assert(texts[2] === 'date: sampledate');
-          assert(texts[3] === 'tags: ');
+          assert(texts[3] === 'tags:');
           assert(texts[4] === '- test');
           assert(texts[5] === '- sample');
           assert(texts[7] === 'sampletext');

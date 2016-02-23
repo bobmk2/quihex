@@ -7,5 +7,10 @@ export default {
   notice: clc.blue,
   question: clc.bgBlack.white,
   script: clc.xterm(10).bgBlack,
-  example: clc.bgBlack.blackBright
+  example: clc.bgBlack.blackBright,
+
+  new: clc.red,
+  update: clc.green,
+  stable: clc.blue,
+  skip: clc.blackBright
 }
