@@ -1,283 +1,305 @@
 #!/usr/bin/env node
 
 'use strict';
+import prompt from 'prompt';
 import command from 'commander';
 import clc from 'cli-color';
-import prompt from 'prompt';
-import jsonfile from 'jsonfile';
-import pathExists from 'path-exists';
-import path from 'path';
-import getHomePath from 'home-path';
-import fs from 'fs';
 
-const APP_NAME = 'quihex';
-const CONFIG_FILE_PATH = path.join(getHomePath(), '.quihexrc');
+import qcore from './quihex-core';
+import qconf from './quihex-config';
 
-const _success = clc.green;
-const _warn = clc.yellow.bold;
-const _error = clc.red.bold;
-const _notice = clc.blue;
-const _script = clc.bgBlack.xterm(10);
-const _ex = (msg) => { return clc.bgBlack.blackBright(`(ex. ${msg})`); };
+import logt from './utils/log-template';
+import clct from './utils/cli-color-template';
 
+const _ex = (msg) => {
+  return clct.example(`(ex. ${msg})`);
+};
 
-prompt.message = `${_notice('Input')}`;
+prompt.message = `${clct.notice('Input')}`;
 prompt.delimiter = `${clc.white(': ')}`;
 
 function onCancel() {
-  console.log('\r\n--------');
-  console.log(_notice('Canceled'));
-  console.log('--------');
+  console.log('\r\n');
+  logt.separator(8);
+  logt.cancel();
+  logt.separator(8);
 }
 
-function onError(errMsg) {
-  console.log(`${_error('Error')}: ${errMsg}`);
+function onError(err) {
+  logt.error(err.message);
 }
+
 
 command
   .command('init')
-  .action( () => {
-
-    fetchConfig().then( (result) => {
-      if (result.exists) {
-        console.log('====================================');
-        console.log(`${_warn('Warning')}: Already exists config file.`);
-        console.log(`${_notice('Tips')}: If you don't update config, Enter ${clc.bold('empty')} with doing nothing.`);
-        console.log('====================================');
-      }
-      var config = result.config;
-      var hexoEx = config.hexo ? '' : _ex('/Users/you/hexo-blog');
-      var qvLibEx = config.quiver ? '' : _ex('/Users/you/Library/Quiver.qvlibrary');
-
-      prompt.start();
-      prompt.get([
-        {
-          name: 'hexoPath',
-          description: clc.bgBlack.white(`${clc.bold('Hexo')} root dir path ${hexoEx}`),
-          default: config.hexo
-        },
-        {
-          name: 'quiverLibPath',
-          description: clc.bgBlack.white(`${clc.bold('Quiver')} library path ${qvLibEx}`),
-          default: config.quiver
-        }], (err, result) => {
-
-        if (typeof result === 'undefined') {
-          onCancel();
-          return;
+  .description('Initialize or update quihex config')
+  .action(() => {
+    tryLoadConfig()
+      .then((tryConfig) => {
+        var config = tryConfig.exists ? tryConfig.data : null;
+        if (config) {
+          logt.separator(30, '=');
+          logt.warning('Already config file exists.');
+          logt.info('If you don\'t update config, Press enter with nothing.');
+          logt.separator(30, '=');
         }
-
-        var hexoPath = result.hexoPath;
-        var quiverLibPath = result.quiverLibPath;
-
-        isValidHexoDir(hexoPath)
-          .then( () => {
-            return isValidQuiverLibraryFile(quiverLibPath)
+        return inputQuiverLibPath(config)
+          .then((quiverLibPath) => {
+            return inputHexoRootPath(config)
+              .then((hexoRootPath) => {
+                return qcore.getAllNotebookMetaFiles(quiverLibPath)
+                  .then((notebookMetaFiles) => {
+                    return inputSyncNotebookName(config, notebookMetaFiles)
+                      .then((syncNotebookName) => {
+                        // Mt. Fuji 🗻🗻🗻
+                        var selectedIndex = notebookMetaFiles.map((meta) => {return meta.name}).indexOf(syncNotebookName);
+                        if (selectedIndex === -1) {
+                          return Promise.reject(new Error(`Sync notebook name is not found. [${syncNotebookName}]`));
+                        }
+                        return qconf.createConfigObj(quiverLibPath, hexoRootPath, notebookMetaFiles[selectedIndex], config ? config.tagsForNotSync : null);
+                      })
+                      .then((configObj) => {
+                        return qconf.writeConfig(configObj);
+                      });
+                  });
+              })
           })
-          .then( () => {
-            return fetchNotebookMetaList(quiverLibPath);
-          })
-          .then( (result) => {
-            console.log('----------');
-            console.log('   Name   ');
-            console.log('----------');
-            result.map( (file) => {
-              console.log(`📓  ${file.name}`);
-            });
-            return inputSyncNotebook(config.syncNotebook, result);
-          })
-          .then( (syncNotebook) => {
-            return createConfig(hexoPath, quiverLibPath, syncNotebook);
-          })
-          .then( () => {
-            console.log('------------------------')
-            console.log(_success('Finished'));
-            console.log(`Change config later > ${_script(`$ vim ~/.quihexrc`)}`);
-            console.log('------------------------')
-          })
-          .catch( (err) => {
-            onError(err);
+          .then(() => {
+            logt.separator(30);
+            logt.finish(`Config file was ${config ? 'updated' : 'created'} :)`);
+            logt.info(`path > ${clct.script(qconf.getConfigFilePath())}`);
+            logt.separator(30);
           });
-      });
-    }).catch( (err) => {
-        onError(err);
       })
+      .catch((err) => {
+        onError(err);
+      });
   });
 
 command
   .command('ls-notebook')
-  .action( () => {
-    loadConfig()
-      .then( (config) => {
-        return fetchNotebookMetaList(config.quiver);
+  .description('Show user\'s quiver notebooks')
+  .action(() => {
+    qconf.loadConfig()
+      .then((config) => {
+        return qcore.getUserNotebookNames(config);
       })
-      .then( (result) => {
-        result.map( (file) => {
-          console.log(`📓  ${file.name}`);
+      .then((notebookNames) => {
+        notebookNames.map((nb) => {
+          console.log(`📗  ${nb}`);
         });
       })
-      .catch( (err) => {
+      .catch((err) => {
         onError(err);
       });
   });
 
+command
+  .command('sync')
+  .description('Sync quiver notes with hexo posts')
+  .option('-y, --yes', 'Auto input yes')
+  .option('-v, --verbose', 'Show all note status')
+  .action((cmd) => {
+    var yesOpt = cmd.yes ? true : false;
+    var verboseOpt = cmd.verbose ? true : false;
 
-function loadNotebookMeta(qvLibRoot, qvnoteFileName) {
-  return new Promise((resolve, reject) => {
-    jsonfile.readFile(path.join(qvLibRoot, qvnoteFileName, 'meta.json'), (err, obj) => {
-      if (err) {
-        reject(err);
-      }
-      resolve(obj);
-    });
+    qconf.loadConfig()
+      .then((config) => {
+        return qcore.getSyncNoteFilePaths(config)
+          .then((notePaths) => {
+            return qcore.getAllBlogStatus(config, notePaths);
+          })
+          .then((results) => {
+            var statusColor = {
+              skip: clct.skip,
+              new: clct.new,
+              update: clct.update,
+              stable: clct.stable
+            }
+
+            results.forEach((result) => {
+              var status = result.status;
+
+              // if verbose option is not set, show only notes with update or new status.
+              if (!verboseOpt && ['skip', 'stable'].indexOf(status) !== -1) {
+                return;
+              }
+              console.log(statusColor[status](status.toUpperCase()) + " " + result.hexoPostObj.filename)
+            });
+
+            var syncTargetPosts = results.filter((result) => {return ['update','new'].indexOf(result.status) !== -1}).map((post) => {return post.hexoPostObj});
+
+            if (syncTargetPosts.length === 0) {
+              logt.info('Already up-to-date');
+              return;
+            }
+
+            // skip question if yes option is set
+            return (yesOpt ? Promise.resolve(true) : inputYesNoConform('Do you sync quiver notes to hexo posts?'))
+              .then((inputYes) => {
+                if (!inputYes) {
+                  logt.cancel('Quiver notes are not synced.');
+                  return;
+                }
+                logt.separator(30);
+                logt.info('Sync start...');
+                return Promise.all(
+                  syncTargetPosts.map((post) => {
+                    return qcore.writeAsHexoPosts(config, post)
+                      .then((result) => {
+                        logt.info(`Success [${post.filename}]`)
+                      });
+                  })
+                )
+                  .then(() => {
+                    logt.separator(30);
+                    logt.finish('Sync succeed');
+                    logt.info('Check updated texts at hexo dir, and deploy them :)');
+                    logt.separator(30);
+                  });
+              })
+          });
+      })
+      .catch((err) => {
+        onError(err);
+      });
   });
-}
 
-function loadConfig() {
-  return pathExists(CONFIG_FILE_PATH)
-    .then( (result) => {
-      if (!result){
-        return Promise.reject(`Config file is not found. Please init > ${_script('$ quihex init')}`);
-      }
-      return new Promise( (resolve, reject) => {
-        jsonfile.readFile(CONFIG_FILE_PATH, (err, obj) => {
-          if (err) {
-            reject(err);
-          }
-          resolve(obj);
-        });
-      });
+function tryLoadConfig() {
+  return qconf.loadConfig()
+    .then((config) => {
+      return Promise.resolve({exists: true, data: config});
+    })
+    .catch((err) => {
+      return Promise.resolve({exists: false, data: null});
     });
 }
 
-function fetchConfig() {
-  return pathExists(CONFIG_FILE_PATH)
-    .then( (result) => {
-      return new Promise( (resolve, reject) => {
-        if (!result) {
-          resolve({exists: false, config: {}});
-        }
-        jsonfile.readFile(CONFIG_FILE_PATH, (err, obj) => {
-          if (err) {
-            reject(err);
-          }
-          resolve({exists: true, config: obj});
-        });
-      });
-    });
-}
-
-function createConfig(hexoPath, quiverLibPath, syncNotebook) {
-  var configObj = {
-    hexo: hexoPath,
-    quiver: quiverLibPath,
-    syncNotebook: syncNotebook,
-    tagsForNotSync: [
-      'hide', 'wip', 'secret'
-    ]
+function inputYesNoConform(description) {
+  var question = {
+    name: 'yesno',
+    description: clct.question(`${description} [Y/n]`),
+    message: 'Please input Y(Yes) or n(no)',
+    type: 'string',
+    required: true,
+    conform: (input) => {
+      return ['Y','Yes','n', 'no'].indexOf(input) !== -1;
+    }
   };
 
-  return new Promise( (resolve, reject) => {
-    jsonfile.writeFile( CONFIG_FILE_PATH, configObj, {spaces: 2}, (err) => {
+  return input(question)
+    .then((answer) => {
+      var v = answer.yesno.trim();
+      return Promise.resolve(['Y', 'Yes'].indexOf(v) !== -1);
+    });
+}
+
+function inputQuiverLibPath(config) {
+  var example = _ex('/Users/you/Library/Quiver.qvlibrary');
+
+  var question = {
+    name: 'quiver',
+    description: clct.question(`${clc.bold('Quiver')} library path ${config ? '' : example}`),
+    default: config ? config.quiver : undefined,
+    message: 'Please input quiver lib path',
+    type: 'string',
+    required: true
+  };
+
+  return input(question)
+    .then((answer) => {
+      var quiverLibPath = answer.quiver.trim();
+      return qcore.validQuiverLib(quiverLibPath)
+        .then(() => {
+          return Promise.resolve(quiverLibPath)
+        })
+    })
+    .catch((err) => {
+      onError(err);
+      // FIXME: will happen stack over flow :(
+      return inputQuiverLibPath(config)
+    })
+}
+
+function inputHexoRootPath(config) {
+  var example = _ex('/Users/you/hexo-blog');
+
+  var question = {
+    name: 'hexo',
+    description: clct.question(`${clc.bold('Hexo')} root dir path ${config ? '' : example}`),
+    default: config ? config.hexo : undefined,
+    message: 'Please input hexo root path',
+    type: 'string',
+    required: true
+  };
+
+  return input(question)
+    .then((answer) => {
+      var hexoRootPath = answer.hexo.trim();
+      return qcore.validHexoRoot(hexoRootPath)
+        .then(() => {
+          return Promise.resolve(hexoRootPath)
+        })
+    })
+    .catch((err) => {
+      onError(err);
+      // FIXME: will happen stack over flow :(
+      return inputHexoRootPath(config)
+    })
+}
+
+function inputSyncNotebookName(config, notebookMetaFiles) {
+  logt.separator(18);
+  console.log(' 📚  Notebooks 📚  ');
+  logt.separator(18);
+
+  notebookMetaFiles.map((nb) => {
+    console.log(`📗  ${nb.name}`);
+  });
+
+  var example = _ex(notebookMetaFiles[0].name);
+
+  var conformFunc = (inputName) => {
+    return notebookMetaFiles.map((notebook) => {
+        return notebook.name;
+      }).indexOf(inputName) != -1;
+  };
+
+  var question = {
+    name: 'syncNotebook',
+    description: clct.question(`Notebook name for syncing to Hexo ${config ? '' : example}`),
+    message: 'Please set the notebook name for sync',
+    default: config && config.syncNotebook ? config.syncNotebook.name : undefined,
+    type: 'string',
+    required: true,
+    conform: conformFunc
+  };
+
+  return input(question)
+    .then((answer) => {
+      var syncNotebook = answer.syncNotebook;
+      return Promise.resolve(syncNotebook);
+    })
+    .catch((err) => {
+      onError(err);
+    });
+}
+
+function input(question) {
+  return new Promise((resolve, reject) => {
+    prompt.start();
+    prompt.get(question, (err, answer) => {
+
+      if (typeof answer === 'undefined') {
+        onCancel();
+        return;
+      }
       if (err) {
         reject(err);
       }
-      resolve();
+      resolve(answer);
     });
   });
 }
 
-function fetchNotebookMetaList(qvLibPath) {
-  return new Promise( (resolve, reject) => {
-      fs.readdir(qvLibPath, (err, files) => {
-        if (err) {
-          reject(err);
-        }
-        resolve(files);
-      })
-    })
-    .then( (files) => {
-      return Promise.all(
-        files.filter( (file) => {
-          var basename = path.basename(file, '.qvnotebook');
-          return basename !== 'Trash' && basename !== 'Inbox';
-        }).map( (file) => {
-          return loadNotebookMeta(qvLibPath, file);
-        })
-      );
-    })
-}
-
-function isValidHexoDir(hexoPath){
-  var hexoConfigPath = path.join(hexoPath, '_config.yml');
-
-  return pathExists(hexoPath)
-    .then( (exists) => {
-      if (!exists) {
-        return Promise.reject(`the haxo dir is not found [${hexoPath}]`);
-      }
-      return pathExists(hexoConfigPath);
-    })
-    .then( (exists) => {
-      if (!exists) {
-        return Promise.reject(`Hexo config file is not found [${hexoConfigPath}]`);
-      }
-      return Promise.resolve();
-    });
-}
-
-function isValidQuiverLibraryFile(qvLibPath){
-  var trashNotebook = path.join(qvLibPath, 'Trash.qvnotebook');
-
-  return pathExists(qvLibPath)
-    .then( (exists) => {
-      if (!exists) {
-        return Promise.reject(`the quiver lib file is not found [${qvLibPath}]`);
-      }
-      return pathExists(trashNotebook);
-    })
-    .then( (exists) => {
-      if (!exists) {
-        return Promise.reject(`This will be not Quiver Library File [${qvLibPath}]`);
-      }
-      return Promise.resolve();
-    });
-}
-
-function inputSyncNotebook(current, notebooks) {
-  return new Promise( (resolve, reject) => {
-    var nbNames = notebooks.map( (nb) => {return nb.name});
-
-    var exMsg = current ? '' : _ex(nbNames[0]);
-    var defaultValue = current ? current.name : undefined;
-
-    prompt.start();
-    prompt.get(
-      [{
-        name: 'syncNotebook',
-        description: clc.bgBlack.white(`Sync notebook name ${exMsg}`),
-        message: 'Please set the notebook name for sync',
-        default: defaultValue,
-        type: 'string',
-        required: true,
-        conform: function (value) {
-          return nbNames.indexOf(value) != -1;
-        }
-      }], (err, result) => {
-        if (err) {
-          reject(err);
-        }
-        if (typeof result === 'undefined') {
-          onCancel();
-          return;
-        }
-
-        var idx = nbNames.indexOf(result.syncNotebook);
-        resolve(notebooks[idx]);
-      }
-    );
-  });
-}
-
-
-command.parse(process.argv);
+command.version('0.0.1').parse(process.argv);

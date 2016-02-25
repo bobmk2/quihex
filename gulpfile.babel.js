@@ -4,7 +4,7 @@ import run from 'gulp-run';
 import runSequence from 'run-sequence';
 
 gulp.task('build', () => {
-  return gulp.src('src/index.js')
+  return gulp.src('src/**/*.js')
     .pipe(babel())
     .pipe(gulp.dest('build'));
 });
