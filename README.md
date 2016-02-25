@@ -1,4 +1,4 @@
-## Quihex
+## Quihex [![npm version](https://badge.fury.io/js/quihex.svg)](https://badge.fury.io/js/quihex)
 
 **Quiver** notes => `quihex sync` => **Hexo** posts
 
