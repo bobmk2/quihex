@@ -41,14 +41,16 @@ class QuihexConfig {
       });
   }
 
-  createConfigObj(quiverLibPath, hexoRootPath, syncNotebook) {
+  createConfigObj(quiverLibPath, hexoRootPath, syncNotebook, tagsForNotSync) {
+    if (typeof tagsForNotSync === 'undefined' || !tagsForNotSync) {
+      tagsForNotSync = ['hide', 'wip', 'secret'];
+    }
+
     return {
       quiver: quiverLibPath,
       hexo: hexoRootPath,
       syncNotebook: syncNotebook,
-      tagsForNotSync: [
-        'hide', 'wip', 'secret'
-      ]
+      tagsForNotSync: tagsForNotSync
     };
   }
 

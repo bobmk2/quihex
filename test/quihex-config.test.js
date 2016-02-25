@@ -207,7 +207,19 @@ describe('QuihexConfig', () => {
 
   describe('createConfigObj(quiverLibPath, hexoRootPath, syncNotebook)', () => {
     context('when input values are valid', () => {
-      it('create config obj', () => {
+      context('with not sync tags', () => {
+        it('create config obj', () => {
+          var obj = qconfig.createConfigObj('qlibpath', 'hexorootpath', {name:'testname', uuid:'testuuid'}, ['test','tag']);
+          assert(obj.quiver === 'qlibpath');
+          assert(obj.hexo === 'hexorootpath');
+          assert(obj.syncNotebook.name === 'testname');
+          assert(obj.syncNotebook.uuid === 'testuuid');
+          assert(obj.tagsForNotSync.length === 2);
+          assert(obj.tagsForNotSync[0] === 'test');
+          assert(obj.tagsForNotSync[1] === 'tag');
+        });
+      });
+      context('without not sync tags', () => {
         var obj = qconfig.createConfigObj('qlibpath', 'hexorootpath', {name:'testname', uuid:'testuuid'});
         assert(obj.quiver === 'qlibpath');
         assert(obj.hexo === 'hexorootpath');

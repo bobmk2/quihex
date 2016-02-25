@@ -56,7 +56,7 @@ command
                         if (selectedIndex === -1) {
                           return Promise.reject(new Error(`Sync notebook name is not found. [${syncNotebookName}]`));
                         }
-                        return qconfig.createConfigObj(quiverLibPath, hexoRootPath, notebookMetaFiles[selectedIndex]);
+                        return qconf.createConfigObj(quiverLibPath, hexoRootPath, notebookMetaFiles[selectedIndex], config ? config.tagsForNotSync : null);
                       })
                       .then((configObj) => {
                         return qconf.writeConfig(configObj);
@@ -171,7 +171,6 @@ function tryLoadConfig() {
       return Promise.resolve({exists: true, data: config});
     })
     .catch((err) => {
-      console.log(err);
       return Promise.resolve({exists: false, data: null});
     });
 }
@@ -250,7 +249,6 @@ function inputHexoRootPath(config) {
 }
 
 function inputSyncNotebookName(config, notebookMetaFiles) {
-  logt.separator(1);
   logt.separator(18);
   console.log(' 📚  Notebooks 📚  ');
   logt.separator(18);
