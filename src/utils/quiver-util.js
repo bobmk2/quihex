@@ -146,23 +146,23 @@ class QuiverUtil {
       });
   }
 
-  convertToHexoPostObj(notebookObj) {
+  convertToHexoPostObj(noteObj) {
     return new Promise((resolve) => {
-      var title = notebookObj.meta.title;
-      var tags = notebookObj.meta.tags;
+      var title = noteObj.meta.title;
+      var tags = noteObj.meta.tags;
 
       var obj = {};
       obj.filename = title.split(' ').join('-');
       obj.title = title;
 
-      var cdate = new Date(notebookObj.meta.created_at * 1000);
+      var cdate = new Date(noteObj.meta.created_at * 1000);
       var toDD = (val) => {
         return ('0' + val).slice(-2);
       };
       obj.date = `${cdate.getFullYear()}-${toDD(cdate.getMonth()+1)}-${toDD(cdate.getDate())} ${toDD(cdate.getHours())}:${toDD(cdate.getMinutes())}:${toDD(cdate.getSeconds())}`;
 
       obj.tags = tags;
-      obj.content = notebookObj.content.cells
+      obj.content = noteObj.content.cells
         .filter((cell) => {
           return cell.type === 'markdown';
         })

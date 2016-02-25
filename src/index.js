@@ -3,12 +3,13 @@
 'use strict';
 import prompt from 'prompt';
 import command from 'commander';
-
 import clc from 'cli-color';
-import clct from './utils/cli-color-template';
 
 import qcore from './quihex-core';
-import qconfig from './quihex-config';
+import qconf from './quihex-config';
+
+import logt from './utils/log-template';
+import clct from './utils/cli-color-template';
 
 const _ex = (msg) => {
   return clct.example(`(ex. ${msg})`);
@@ -18,26 +19,29 @@ prompt.message = `${clct.notice('Input')}`;
 prompt.delimiter = `${clc.white(': ')}`;
 
 function onCancel() {
-  console.log('\r\n--------');
-  console.log(clct.notice('Canceled'));
-  console.log('--------');
+  console.log('\r\n');
+  logt.separator(8);
+  logt.cancel();
+  logt.separator(8);
 }
 
 function onError(err) {
-  console.log(`${clct.error('Error')}: ${err.message}`);
+  logt.error(err.message);
 }
+
 
 command
   .command('init')
+  .description('Initialize or update quihex config')
   .action(() => {
     tryLoadConfig()
       .then((tryConfig) => {
         var config = tryConfig.exists ? tryConfig.data : null;
         if (config) {
-          console.log('====================================');
-          console.log(`${clct.warning('Warning')}: Already config file exists.`);
-          console.log(`${clct.notice('Info')}: If you don't update config, Enter ${clc.bold('empty')} with nothing.`);
-          console.log('====================================');
+          logt.separator(30, '=');
+          logt.warning('Already config file exists.');
+          logt.info('If you don\'t update config, Press enter with nothing.');
+          logt.separator(30, '=');
         }
         return inputQuiverLibPath(config)
           .then((quiverLibPath) => {
@@ -55,17 +59,17 @@ command
                         return qconfig.createConfigObj(quiverLibPath, hexoRootPath, notebookMetaFiles[selectedIndex]);
                       })
                       .then((configObj) => {
-                        return qconfig.writeConfig(configObj);
+                        return qconf.writeConfig(configObj);
                       });
                   });
               })
           })
-      })
-      .then(() => {
-        console.log('----------------------------------------');
-        console.log(`${clct.success('Finished')} :)`);
-        console.log(`${clct.notice('Info')}: Config file path is ${clct.script(qconfig.getConfigFilePath())}`);
-        console.log('----------------------------------------');
+          .then(() => {
+            logt.separator(30);
+            logt.finish(`Config file was ${config ? 'updated' : 'created'} :)`);
+            logt.info(`path > ${clct.script(qconf.getConfigFilePath())}`);
+            logt.separator(30);
+          });
       })
       .catch((err) => {
         onError(err);
@@ -74,8 +78,9 @@ command
 
 command
   .command('ls-notebook')
+  .description('Show user\'s quiver notebooks')
   .action(() => {
-    qconfig.loadConfig()
+    qconf.loadConfig()
       .then((config) => {
         return qcore.getUserNotebookNames(config);
       })
@@ -98,7 +103,7 @@ command
     var yesOpt = cmd.yes ? true : false;
     var verboseOpt = cmd.verbose ? true : false;
 
-    qconfig.loadConfig()
+    qconf.loadConfig()
       .then((config) => {
         return qcore.getSyncNoteFilePaths(config)
           .then((notePaths) => {
@@ -119,14 +124,13 @@ command
               if (!verboseOpt && ['skip', 'stable'].indexOf(status) !== -1) {
                 return;
               }
-
               console.log(statusColor[status](status.toUpperCase()) + " " + result.hexoPostObj.filename)
             });
 
-            var syncPosts = results.filter((result) => {return ['update','new'].indexOf(result.status) !== -1}).map((post) => {return post.hexoPostObj});
+            var syncTargetPosts = results.filter((result) => {return ['update','new'].indexOf(result.status) !== -1}).map((post) => {return post.hexoPostObj});
 
-            if (syncPosts.length === 0) {
-              console.log(`${clct.notice('Info')}: Already up-to-date`);
+            if (syncTargetPosts.length === 0) {
+              logt.info('Already up-to-date');
               return;
             }
 
@@ -134,20 +138,24 @@ command
             return (yesOpt ? Promise.resolve(true) : inputYesNoConform('Do you sync quiver notes to hexo posts?'))
               .then((inputYes) => {
                 if (!inputYes) {
-                  console.log(`${clct.notice('Canceled')}: Quiver notes are not synced.`);
+                  logt.cancel('Quiver notes are not synced.');
                   return;
                 }
-                console.log(`${clct.notice('Info')}: Sync start...`);
+                logt.separator(30);
+                logt.info('Sync start...');
                 return Promise.all(
-                  syncPosts.map((post) => {
+                  syncTargetPosts.map((post) => {
                     return qcore.writeAsHexoPosts(config, post)
+                      .then((result) => {
+                        logt.info(`Success [${post.filename}]`)
+                      });
                   })
                 )
-                  .then((results) => {
-                    console.log('----------------------------------------');
-                    console.log(`${clct.success('Finished')}: Sync succeed`);
-                    console.log(`${clct.notice('Info')}: Check updated texts at hexo dir, and deploy them :)`)
-                    console.log('----------------------------------------');
+                  .then(() => {
+                    logt.separator(30);
+                    logt.finish('Sync succeed');
+                    logt.info('Check updated texts at hexo dir, and deploy them :)');
+                    logt.separator(30);
                   });
               })
           });
@@ -158,7 +166,7 @@ command
   });
 
 function tryLoadConfig() {
-  return qconfig.loadConfig()
+  return qconf.loadConfig()
     .then((config) => {
       return Promise.resolve({exists: true, data: config});
     })
@@ -178,7 +186,7 @@ function inputYesNoConform(description) {
     conform: (input) => {
       return ['Y','Yes','n', 'no'].indexOf(input) !== -1;
     }
-  }
+  };
 
   return input(question)
     .then((answer) => {
@@ -242,9 +250,10 @@ function inputHexoRootPath(config) {
 }
 
 function inputSyncNotebookName(config, notebookMetaFiles) {
-  console.log('-----------------');
-  console.log(' 📚  Notebooks    ');
-  console.log('-----------------');
+  logt.separator(1);
+  logt.separator(18);
+  console.log(' 📚  Notebooks 📚  ');
+  logt.separator(18);
 
   notebookMetaFiles.map((nb) => {
     console.log(`📗  ${nb.name}`);
