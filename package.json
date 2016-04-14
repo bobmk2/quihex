@@ -1,6 +1,6 @@
 {
   "name": "quihex",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "Sync blog posts to Hexo that are written by Quiver.",
   "preferGlobal": true,
   "bin": {
