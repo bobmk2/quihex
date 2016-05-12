@@ -164,10 +164,8 @@ class QuiverUtil {
       obj.content = noteObj.content.cells
         .map((cell) => {
           if (cell.type === 'markdown') {
-            logt.info(cell.type);
             return cell.data;
           } else if (cell.type === 'code') {
-            logt.info(cell.language);
             return `\`\`\`${cell.language}\n${cell.data}\n\`\`\``;
           }
         })
