@@ -3,7 +3,6 @@ import path from 'path';
 import fs from 'fs';
 import fsSync from 'fs-sync';
 import expandTilde from 'expand-tilde';
-
 import fileUtil from './file-util';
 
 class QuiverUtil {
@@ -159,18 +158,20 @@ class QuiverUtil {
       var toDD = (val) => {
         return ('0' + val).slice(-2);
       };
-      obj.date = `${cdate.getFullYear()}-${toDD(cdate.getMonth()+1)}-${toDD(cdate.getDate())} ${toDD(cdate.getHours())}:${toDD(cdate.getMinutes())}:${toDD(cdate.getSeconds())}`;
+      obj.date = `${cdate.getFullYear()}-${toDD(cdate.getMonth() + 1)}-${toDD(cdate.getDate())} ${toDD(cdate.getHours())}:${toDD(cdate.getMinutes())}:${toDD(cdate.getSeconds())}`;
 
       obj.tags = tags;
       obj.content = noteObj.content.cells
-        .filter((cell) => {
-          return cell.type === 'markdown';
-        })
         .map((cell) => {
-          return cell.data;
+          if (cell.type === 'markdown') {
+            logt.info(cell.type);
+            return cell.data;
+          } else if (cell.type === 'code') {
+            logt.info(cell.language);
+            return `\`\`\`${cell.language}\n${cell.data}\n\`\`\``;
+          }
         })
         .join('\n\n');
-
       resolve(obj);
     });
   }
