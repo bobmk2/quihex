@@ -12,223 +12,237 @@ import fileUtil from '../src/utils/file-util';
 import qconfig from '../src/quihex-config';
 
 function getConfigJsonStr() {
-  return '{"quiver":"quiver-path","hexo":"hexo-path","syncNotebook":{"name":"Blog","uuid":"UUID-EXAMPLE"},"tagsForNotSync":["test","tag","yes"]}';
+  return '{"quiver":"quiver-path","hexo":"hexo-path","syncNotebook":{"name":"Blog","uuid":"UUID-EXAMPLE"},"tagsForSync":["test","tag","yes"]}';
+}
+
+const TEST_CONFIG_OBJ = {"quiver":"quiver-path","hexo":"hexo-path","syncNotebook":{"name":"Blog","uuid":"UUID-EXAMPLE"},"tagsForSync":["test","tag","yes"]};
+
+function stubGetConfigFilePath(path) {
+  let stub = sinon.stub(qconfig, '_getConfigFilePath');
+  stub.returns(path);
+}
+function restoreGetConfigFilePath() {
+  qconfig._getConfigFilePath.restore();
+}
+
+function stubExistsConfigFile(result) {
+  let stub = sinon.stub(qconfig, '_existsConfigFile');
+  stub.returns(Promise.resolve(result));
+}
+function restoreExistsConfigFile() {
+  qconfig._existsConfigFile.restore();
+}
+
+function stubReadJsonConfigFile(json) {
+  let stub = sinon.stub(qconfig, '_readJsonConfigFile');
+  stub.returns(Promise.resolve(json));
+}
+function restoreReadJsonConfigFile() {
+  qconfig._readJsonConfigFile.restore();
 }
 
 describe('QuihexConfig', () => {
-  describe('getConfigFilePath()', () => {
-    context('when config file path is set', () => {
-      before(() => {
-        let stub = sinon.stub(path, 'join');
-        var homePath = getHomePath();
-        stub.withArgs(homePath, '.quihexrc').returns('test-path');
-      });
-      it('should get config file path', () => {
-        var path = qconfig.getConfigFilePath();
-        assert(path === 'test-path');
-      });
-      after(() => {
-        path.join.restore();
-      });
-    });
+  before(() => {
+    stubGetConfigFilePath('.tmp/.quihexrc');
+  });
+  after(() => {
+    restoreGetConfigFilePath();
   });
 
-  describe('loadConfig()', () => {
-    context('when quihex config file exists', () => {
-      context('and is valid', () => {
-        before(() => {
-          let stub = sinon.stub(qconfig, 'getConfigFilePath');
-          stub.withArgs().returns('.tmp/.quihexrc');
-          let stub2 = sinon.stub(qconfig, '_validQuihexConfig');
-          stub2.returns(Promise.resolve(JSON.parse(getConfigJsonStr())));
-
-          mkdir.sync('.tmp');
-          fs.writeFileSync('.tmp/.quihexrc', getConfigJsonStr(), 'utf8');
-        });
-        it('should load config', () => {
-          return qconfig.loadConfig()
-            .then((qconf) => {
-              assert(qconf.quiver === 'quiver-path');
-              assert(qconf.hexo === 'hexo-path');
-              assert(qconf.syncNotebook.name === 'Blog');
-              assert(qconf.syncNotebook.uuid === 'UUID-EXAMPLE');
-              assert(qconf.tagsForNotSync[0] === 'test');
-              assert(qconf.tagsForNotSync[1] === 'tag');
-              assert(qconf.tagsForNotSync[2] === 'yes');
-            });
-        });
-        after(() => {
-          del.sync('.tmp');
-          qconfig.getConfigFilePath.restore();
-          qconfig._validQuihexConfig.restore();
-        });
-      });
-      context('and is invalid', () => {
-        before(() => {
-          let stub = sinon.stub(qconfig, 'getConfigFilePath');
-          stub.withArgs().returns('.tmp/.quihexrc');
-          let stub2 = sinon.stub(qconfig, '_validQuihexConfig');
-          stub2.returns(Promise.reject('local error'));
-
-          mkdir.sync('.tmp');
-          fs.writeFileSync('.tmp/.quihexrc', '{"sample":true}', 'utf8');
-        });
-        it('should load config', () => {
-          return qconfig.loadConfig()
-            .catch((err) => {
-              assert(err === 'local error');
-            });
-        });
-        after(() => {
-          del.sync('.tmp');
-          qconfig.getConfigFilePath.restore();
-          qconfig._validQuihexConfig.restore();
-        });
-      });
-    });
-
+  describe('loadConfigUnsafety(config)', () => {
     context('when quihex config file is not found', () => {
       before(() => {
-        let stub = sinon.stub(qconfig, 'getConfigFilePath');
-        stub.withArgs().returns('.tmp/.quihexrc');
+        stubExistsConfigFile(false);
       });
       it('should catch error', () => {
-        return qconfig.loadConfig()
+        return qconfig.loadConfigUnsafety()
           .catch((err) => {
             assert(err.name === 'Error');
             assert(err.message === 'Config file is not found. Please init > \'$ quihex init\'');
           });
       });
       after(() => {
-        qconfig.getConfigFilePath.restore();
+        restoreExistsConfigFile();
+      });
+    });
+    context('when broken quihex config file is found', () => {
+      before(() => {
+        stubExistsConfigFile(true);
+        stubReadJsonConfigFile({});
+      });
+      after(() => {
+        restoreExistsConfigFile();
+        restoreReadJsonConfigFile();
+      });
+      it('should get broken config', () => {
+        var obj = JSON.parse(getConfigJsonStr());
+        return qconfig.loadConfigUnsafety(obj)
+          .then((config) => {
+            assert(typeof config.hexo === 'undefined');
+            assert(typeof config.quiver === 'undefined');
+            assert(typeof config.syncNotebook === 'undefined');
+            assert(typeof config.tagsForSync ==='undefined');
+          });
       });
     });
 
   });
 
-  describe('_validQuihexConfig(config)', () => {
-    context('when quihex config file has all require fields', () => {
+  describe('loadValidatedConfig()', () => {
+    context('when quihex config file is not found', () => {
       before(() => {
-        mkdir.sync('.tmp');
-        fs.writeFileSync('.tmp/.quihexrc', getConfigJsonStr(), 'utf8');
-      });
-      it('should be valid', () => {
-        var obj = JSON.parse(getConfigJsonStr());
-        return qconfig._validQuihexConfig(obj)
-          .then((config) => {
-            assert(config.hexo === obj.hexo);
-            assert(config.quiver === obj.quiver);
-            assert(config.syncNotebook.name === obj.syncNotebook.name);
-            assert(config.syncNotebook.uuid === obj.syncNotebook.uuid);
-            assert(config.tagsForNotSync === obj.tagsForNotSync);
-          });
+        stubExistsConfigFile(false);
       });
       after(() => {
-        del.sync('.tmp');
+        restoreExistsConfigFile();
+      });
+      it('should catch error', () => {
+        return qconfig.loadValidatedConfig()
+          .catch((err) => {
+            assert(err.name === 'Error');
+            assert(err.message === 'Config file is not found. Please init > \'$ quihex init\'');
+          });
+      });
+    });
+
+    context('when quihex config file has all require fields', () => {
+      before(() => {
+        stubExistsConfigFile(true);
+        stubReadJsonConfigFile(TEST_CONFIG_OBJ);
+      });
+      after(() => {
+        restoreExistsConfigFile();
+        restoreReadJsonConfigFile();
+      });
+      it('should be valid', () => {
+        return qconfig.loadValidatedConfig()
+          .then((config) => {
+            assert(config.hexo === TEST_CONFIG_OBJ.hexo);
+            assert(config.quiver === TEST_CONFIG_OBJ.quiver);
+            assert(config.syncNotebook.name === TEST_CONFIG_OBJ.syncNotebook.name);
+            assert(config.syncNotebook.uuid === TEST_CONFIG_OBJ.syncNotebook.uuid);
+            assert(config.tagsForSync === TEST_CONFIG_OBJ.tagsForSync);
+          });
+      });
+    });
+
+    context('when quihex config file has', () => {
+      before(() => {
+        stubExistsConfigFile(true);
+        var conf = Object.assign({}, TEST_CONFIG_OBJ, {tagsForNotSync: {}});
+        stubReadJsonConfigFile(conf);
+      });
+      after(() => {
+        restoreExistsConfigFile();
+        restoreReadJsonConfigFile();
+      });
+      context('tagsForNotSync', () => {
+        it('should throw error about disable conf', () => {
+          return qconfig.loadValidatedConfig()
+            .catch((err) => {
+              assert(err.name === 'Error');
+              assert(err.message === `Sorry, \'tagsForNotSync\' config is no longer enabled config. Please use \'tagsForSync\' for sync quiver posts. Try re-initialize > '$ quihex init'.`);
+            });
+        });
       });
     });
 
     context('when quihex config file dose not have', () => {
       before(() => {
-        let stub = sinon.stub(qconfig, 'getConfigFilePath');
-        stub.withArgs().returns('.tmp/.quihexrc');
+        stubExistsConfigFile(true);
       });
+      after(() => {
+        restoreExistsConfigFile();
+      });
+
+      function _assertError() {
+        return qconfig.loadValidatedConfig()
+          .catch((err) => {
+            assert(err.name === 'Error');
+            assert(err.message === 'Config file is broken. Please remove config file > \'$ rm .tmp/.quihexrc\', and re-init > \'$ quihex init\'');
+          })
+      }
+
       context('hexo field', () => {
+        before(() => {
+          stubReadJsonConfigFile(Object.assign({}, TEST_CONFIG_OBJ, {hexo:undefined}));
+        });
+        after(() => {
+          restoreReadJsonConfigFile();
+        });
         it('should be invalid', () => {
-          var json = JSON.parse(getConfigJsonStr());
-          delete json.hexo;
-          return qconfig._validQuihexConfig(json)
-            .catch((err) => {
-              assert(err.name === 'Error');
-              assert(err.message === 'Config file is broken. Please remove config file > \'$ rm .tmp/.quihexrc\', and re-init > \'$ quihex init\'');
-            });
+          return _assertError();
         });
       });
       context('quiver field', () => {
+        before(() => {
+          stubReadJsonConfigFile(Object.assign({}, TEST_CONFIG_OBJ, {quiver:undefined}));
+        });
+        after(() => {
+          restoreReadJsonConfigFile();
+        });
         it('should be invalid', () => {
-          var json = JSON.parse(getConfigJsonStr());
-          delete json.quiver;
-          return qconfig._validQuihexConfig(json)
-            .catch((err) => {
-              assert(err.name === 'Error');
-              assert(err.message === 'Config file is broken. Please remove config file > \'$ rm .tmp/.quihexrc\', and re-init > \'$ quihex init\'');
-            });
+          return _assertError();
         });
       });
       context('syncNotebook field', () => {
+        before(() => {
+          stubReadJsonConfigFile(Object.assign({}, TEST_CONFIG_OBJ, {syncNoteBook:undefined}));
+        });
+        after(() => {
+          restoreReadJsonConfigFile();
+        });
         it('should be invalid', () => {
-          var json = JSON.parse(getConfigJsonStr());
-          delete json.syncNotebook;
-          return qconfig._validQuihexConfig(json)
-            .catch((err) => {
-              assert(err.name === 'Error');
-              assert(err.message === 'Config file is broken. Please remove config file > \'$ rm .tmp/.quihexrc\', and re-init > \'$ quihex init\'');
-            });
+          return _assertError();
         });
       });
       context('syncNotebook.name field', () => {
+        before(() => {
+          stubReadJsonConfigFile(Object.assign({}, TEST_CONFIG_OBJ, {syncNotebook:{}}));
+        });
+        after(() => {
+          restoreReadJsonConfigFile();
+        });
         it('should be invalid', () => {
-          var json = JSON.parse(getConfigJsonStr());
-          delete json.syncNotebook.name;
-          return qconfig._validQuihexConfig(json)
-            .catch((err) => {
-              assert(err.name === 'Error');
-              assert(err.message === 'Config file is broken. Please remove config file > \'$ rm .tmp/.quihexrc\', and re-init > \'$ quihex init\'');
-            });
+          return _assertError();
         });
       });
       context('syncNotebook.uuid field', () => {
+        before(() => {
+          stubReadJsonConfigFile(Object.assign({}, TEST_CONFIG_OBJ, {syncNotebook:{}}));
+        });
+        after(() => {
+          restoreReadJsonConfigFile();
+        });
         it('should be invalid', () => {
-          var json = JSON.parse(getConfigJsonStr());
-          delete json.syncNotebook.uuid;
-          return qconfig._validQuihexConfig(json)
-            .catch((err) => {
-              assert(err.name === 'Error');
-              assert(err.message === 'Config file is broken. Please remove config file > \'$ rm .tmp/.quihexrc\', and re-init > \'$ quihex init\'');
-            });
+          return _assertError();
         });
       });
-      context('tagsForNotSync field', () => {
-        it('should be invalid', () => {
-          var json = JSON.parse(getConfigJsonStr());
-          delete json.tagsForNotSync;
-          return qconfig._validQuihexConfig(json)
-            .catch((err) => {
-              assert(err.name === 'Error');
-              assert(err.message === 'Config file is broken. Please remove config file > \'$ rm .tmp/.quihexrc\', and re-init > \'$ quihex init\'');
-            });
+      context('tagsForSync field', () => {
+        before(() => {
+          stubReadJsonConfigFile(Object.assign({}, TEST_CONFIG_OBJ, {tagsFprSync:undefined}));
         });
-      });
-      after(() => {
-        qconfig.getConfigFilePath.restore();
+        after(() => {
+          restoreReadJsonConfigFile();
+        });
+        it('should be invalid', () => {
+          return _assertError();
+        });
       });
     });
   });
 
   describe('createConfigObj(quiverLibPath, hexoRootPath, syncNotebook)', () => {
-    context('when input values are valid', () => {
-      context('with not sync tags', () => {
-        it('create config obj', () => {
-          var obj = qconfig.createConfigObj('qlibpath', 'hexorootpath', {name:'testname', uuid:'testuuid'}, ['test','tag']);
-          assert(obj.quiver === 'qlibpath');
-          assert(obj.hexo === 'hexorootpath');
-          assert(obj.syncNotebook.name === 'testname');
-          assert(obj.syncNotebook.uuid === 'testuuid');
-          assert(obj.tagsForNotSync.length === 2);
-          assert(obj.tagsForNotSync[0] === 'test');
-          assert(obj.tagsForNotSync[1] === 'tag');
-        });
-      });
-      context('without not sync tags', () => {
-        var obj = qconfig.createConfigObj('qlibpath', 'hexorootpath', {name:'testname', uuid:'testuuid'});
+    context('when input valid values', () => {
+      it('create config obj', () => {
+        var obj = qconfig.createConfigObj('qlibpath', 'hexorootpath', {name:'testname', uuid:'testuuid'}, ['sync','tag']);
         assert(obj.quiver === 'qlibpath');
         assert(obj.hexo === 'hexorootpath');
         assert(obj.syncNotebook.name === 'testname');
         assert(obj.syncNotebook.uuid === 'testuuid');
-        assert(obj.tagsForNotSync.length === 3);
-        assert(obj.tagsForNotSync[0] === 'hide');
-        assert(obj.tagsForNotSync[1] === 'wip');
-        assert(obj.tagsForNotSync[2] === 'secret');
+        assert(obj.tagsForSync.length === 2);
+        assert(obj.tagsForSync[0] === 'sync');
+        assert(obj.tagsForSync[1] === 'tag');
       });
     });
   });
@@ -236,9 +250,10 @@ describe('QuihexConfig', () => {
   describe('writeConfig(configObj)', () => {
     context('when config obj is valid', () => {
       before(() => {
-        let stub = sinon.stub(qconfig, 'getConfigFilePath');
-        stub.withArgs().returns('.tmp/.quihexrc');
         mkdir.sync('.tmp');
+      });
+      after(() => {
+        del.sync('.tmp');
       });
       it('should write file', () => {
         var obj = {sample: true};
@@ -253,10 +268,6 @@ describe('QuihexConfig', () => {
           .then((obj) => {
             assert(obj.sample === true);
           });
-      });
-      after(() => {
-        qconfig.getConfigFilePath.restore();
-        del.sync('.tmp');
       });
     });
   });

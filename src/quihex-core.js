@@ -86,10 +86,8 @@ class QuihexCore {
           }
         }
 
-        // if quihex note has not sync tag, skip sync it.
-        if (hexoPostObj.tags.filter((tag) => {
-            return (quihexConfig.tagsForNotSync.indexOf(tag) !== -1);
-          }).length > 0) {
+        // if quihex note dose'nt have sync tag, skip sync it.
+        if (Array.from(new Set(hexoPostObj.tags.concat(quihexConfig.tagsForSync)))) {
           return Promise.resolve(createStatus('skip'));
         }
 

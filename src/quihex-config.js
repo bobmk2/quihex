@@ -7,12 +7,44 @@ import fileUtil from './utils/file-util'
 
 class QuihexConfig {
 
-  getConfigFilePath() {
-    return path.join(getHomePath(), '.quihexrc');
+  loadValidatedConfig() {
+    return this._loadConfig(true);
   }
+
+  /**
+   * WARNING: it is not to validate config file
+   */
+  loadConfigUnsafety() {
+    return this._loadConfig(false);
+  }
+
+  createConfigObj(quiverLibPath, hexoRootPath, syncNotebook, tagsForSync) {
+    return {
+      quiver: quiverLibPath,
+      hexo: hexoRootPath,
+      syncNotebook,
+      tagsForSync
+    };
+  }
+
+  writeConfig(configObj) {
+    return new Promise((resolve, reject) => {
+      jsonFile.writeFile(this._getConfigFilePath(), configObj, {spaces: 2}, (err) => {
+        if (err) {
+          reject(err);
+        }
+        resolve(configObj);
+      });
+    });
+  }
+
 
   _validQuihexConfig(config) {
     return new Promise((resolve, reject) => {
+      if (typeof config.tagsForNotSync !== 'undefined') {
+        reject(new Error(`Sorry, \'tagsForNotSync\' config is no longer enabled config. Please use \'tagsForSync\' for sync quiver posts. Try re-initialize > '$ quihex init'.`));
+      }
+
       if (
         typeof config === 'undefined' ||
         typeof config.hexo === 'undefined' ||
@@ -20,49 +52,40 @@ class QuihexConfig {
         typeof config.syncNotebook === 'undefined' ||
         typeof config.syncNotebook.name === 'undefined' ||
         typeof config.syncNotebook.uuid === 'undefined' ||
-        typeof config.tagsForNotSync === 'undefined'
+        typeof config.tagsForSync === 'undefined'
       ) {
-        reject(new Error(`Config file is broken. Please remove config file > '$ rm ${this.getConfigFilePath()}', and re-init > '$ quihex init'`))
+        reject(new Error(`Config file is broken. Please remove config file > '$ rm ${this._getConfigFilePath()}', and re-init > '$ quihex init'`));
       }
+
       resolve(config);
     })
   }
 
-  loadConfig() {
-    return pathExists(this.getConfigFilePath())
+  _loadConfig(validate = true) {
+    return this._existsConfigFile()
       .then((result) => {
         if (!result) {
           return Promise.reject(new Error(`Config file is not found. Please init > '$ quihex init'`));
         }
-        return fileUtil.readJsonFilePromise(this.getConfigFilePath());
+        return this._readJsonConfigFile();
       })
       .then((config) => {
-        return this._validQuihexConfig(config);
+        return validate ? this._validQuihexConfig(config) : Promise.resolve(config);
       });
   }
 
-  createConfigObj(quiverLibPath, hexoRootPath, syncNotebook, tagsForNotSync) {
-    if (typeof tagsForNotSync === 'undefined' || !tagsForNotSync) {
-      tagsForNotSync = ['hide', 'wip', 'secret'];
-    }
-
-    return {
-      quiver: quiverLibPath,
-      hexo: hexoRootPath,
-      syncNotebook: syncNotebook,
-      tagsForNotSync: tagsForNotSync
-    };
+  _getConfigFilePath() {
+    return path.join(getHomePath(), '.quihexrc');
   }
 
-  writeConfig(configObj) {
-    return new Promise((resolve, reject) => {
-      jsonFile.writeFile(this.getConfigFilePath(), configObj, {spaces: 2}, (err) => {
-        if (err) {reject(err);}
-        resolve();
-      });
-    });
+  _existsConfigFile() {
+    return pathExists(this._getConfigFilePath());
   }
 
+  _readJsonConfigFile() {
+    return fileUtil.readJsonFilePromise(this._getConfigFilePath());
+  }
 }
+
 
 export default new QuihexConfig();
