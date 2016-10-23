@@ -9,7 +9,8 @@
   "scripts": {
     "build": "gulp build",
     "watch": "gulp watch",
-    "test": "mocha --compilers js:espower-babel/guess test/*.js test/**/*.js"
+    "test": "mocha --compilers js:espower-babel/guess test/*.js test/**/*.js",
+    "link": "gulp link"
   },
   "repository": {
     "type": "git",

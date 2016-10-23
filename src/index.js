@@ -29,7 +29,6 @@ function onError(err) {
   logt.error(err.message);
 }
 
-
 command
   .command('init')
   .description('Initialize or update quihex config')
@@ -40,7 +39,7 @@ command
         if (config) {
           logt.separator(30, '=');
           logt.warning('Already config file exists.');
-          logt.info('If you don\'t update config, Press enter with nothing.');
+          logt.info('If you don\'t need to update config, Press enter with nothing.');
           logt.separator(30, '=');
         }
         return inputQuiverLibPath(config)
@@ -52,11 +51,13 @@ command
                     return inputSyncNotebookName(config, notebookMetaFiles)
                       .then((syncNotebookName) => {
                         // Mt. Fuji 🗻🗻🗻
-                        var selectedIndex = notebookMetaFiles.map((meta) => {return meta.name}).indexOf(syncNotebookName);
+                        var selectedIndex = notebookMetaFiles.map((meta) => {
+                          return meta.name
+                        }).indexOf(syncNotebookName);
                         if (selectedIndex === -1) {
                           return Promise.reject(new Error(`Sync notebook name is not found. [${syncNotebookName}]`));
                         }
-                        return qconf.createConfigObj(quiverLibPath, hexoRootPath, notebookMetaFiles[selectedIndex], config ? config.tagsForNotSync : null);
+                        return qconf.createConfigObj(quiverLibPath, hexoRootPath, notebookMetaFiles[selectedIndex], config && typeof config.tagsForSync !== 'undefined' ? config.tagsForSync : ['_sync_', '_blog_']);
                       })
                       .then((configObj) => {
                         return qconf.writeConfig(configObj);
@@ -64,10 +65,11 @@ command
                   });
               })
           })
-          .then(() => {
+          .then(confObj => {
             logt.separator(30);
             logt.finish(`Config file was ${config ? 'updated' : 'created'} :)`);
-            logt.info(`path > ${clct.script(qconf.getConfigFilePath())}`);
+            logt.info(`path > ${clct.script(qconf._getConfigFilePath())}`);
+            logt.info(`config json > \r\n${clct.script(JSON.stringify(confObj, null, 2))}`);
             logt.separator(30);
           });
       })
@@ -80,7 +82,7 @@ command
   .command('ls-notebook')
   .description('Show user\'s quiver notebooks')
   .action(() => {
-    qconf.loadConfig()
+    qconf.loadValidatedConfig()
       .then((config) => {
         return qcore.getUserNotebookNames(config);
       })
@@ -103,7 +105,7 @@ command
     var yesOpt = cmd.yes ? true : false;
     var verboseOpt = cmd.verbose ? true : false;
 
-    qconf.loadConfig()
+    qconf.loadValidatedConfig()
       .then((config) => {
         return qcore.getSyncNoteFilePaths(config)
           .then((notePaths) => {
@@ -127,7 +129,11 @@ command
               console.log(statusColor[status](status.toUpperCase()) + " " + result.hexoPostObj.filename)
             });
 
-            var syncTargetPosts = results.filter((result) => {return ['update','new'].indexOf(result.status) !== -1}).map((post) => {return post.hexoPostObj});
+            var syncTargetPosts = results.filter((result) => {
+              return ['update', 'new'].indexOf(result.status) !== -1
+            }).map((post) => {
+              return post.hexoPostObj
+            });
 
             if (syncTargetPosts.length === 0) {
               logt.info('Already up-to-date');
@@ -150,7 +156,7 @@ command
                         logt.info(`Success [${post.filename}]`)
                       });
                   })
-                )
+                  )
                   .then(() => {
                     logt.separator(30);
                     logt.finish('Sync succeed');
@@ -166,7 +172,7 @@ command
   });
 
 function tryLoadConfig() {
-  return qconf.loadConfig()
+  return qconf.loadConfigUnsafety()
     .then((config) => {
       return Promise.resolve({exists: true, data: config});
     })
@@ -183,7 +189,7 @@ function inputYesNoConform(description) {
     type: 'string',
     required: true,
     conform: (input) => {
-      return ['Y','Yes','n', 'no'].indexOf(input) !== -1;
+      return ['Y', 'Yes', 'n', 'no'].indexOf(input) !== -1;
     }
   };
 
@@ -200,7 +206,7 @@ function inputQuiverLibPath(config) {
   var question = {
     name: 'quiver',
     description: clct.question(`${clc.bold('Quiver')} library path ${config ? '' : example}`),
-    default: config ? config.quiver : undefined,
+    default: config && typeof config.quiver !== 'undefined' ? config.quiver : undefined,
     message: 'Please input quiver lib path',
     type: 'string',
     required: true
@@ -227,7 +233,7 @@ function inputHexoRootPath(config) {
   var question = {
     name: 'hexo',
     description: clct.question(`${clc.bold('Hexo')} root dir path ${config ? '' : example}`),
-    default: config ? config.hexo : undefined,
+    default: config && typeof config.hexo !== 'undefined' ? config.hexo : undefined,
     message: 'Please input hexo root path',
     type: 'string',
     required: true
@@ -269,7 +275,7 @@ function inputSyncNotebookName(config, notebookMetaFiles) {
     name: 'syncNotebook',
     description: clct.question(`Notebook name for syncing to Hexo ${config ? '' : example}`),
     message: 'Please set the notebook name for sync',
-    default: config && config.syncNotebook ? config.syncNotebook.name : undefined,
+    default: config && typeof config.syncNotebook !== 'undefined' && typeof config.syncNotebook.name !== 'undefined' ? config.syncNotebook.name : undefined,
     type: 'string',
     required: true,
     conform: conformFunc
@@ -302,4 +308,17 @@ function input(question) {
   });
 }
 
-command.version('0.0.1').parse(process.argv);
+command
+  .version('0.0.1')
+  .parse(process.argv);
+
+if (!process.argv.slice(2).length) {
+  const logo = `   ____            _   _
+  / __ \\          (_) | |
+ | |  | |  _   _   _  | |__     ___  __  __
+ | |  | | | | | | | | | '_ \\   / _ \\ \\ \\/ /
+ | |__| | | |_| | | | | | | | |  __/  >  <
+  \\___\\_\\  \\__,_| |_| |_| |_|  \\___| /_/\\_\\`;
+  console.log(logo);
+  command.outputHelp();
+}

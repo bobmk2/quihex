@@ -44,16 +44,17 @@ $ ssh myblog.com
 ### Tips
 
 ```bash
-# Setting tags for not sync with quiver notes
-#  - quihex dose not sync the note if you set the tag to your notes
+# Setting tags for sync with quiver notes
+#  - sync the note if you set the tag to your notes
+# WARNING:
+#  - quihex removes tags in tagsForSync from quiver notes when converting notes.
 $ vim ~/.quihexrc
 # ex)
 # ~~~
-"tagsForNotSync": [
-  "hide",
-  "wip",
-  "secret",
-  "newtag" <= Insert
+"tagsForSync": [
+  "_sync_",
+  "_blog_",
+  "_new_tag_" <= Insert
 ]
 # ~~~
 
