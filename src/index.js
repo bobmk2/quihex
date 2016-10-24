@@ -57,7 +57,9 @@ command
                         if (selectedIndex === -1) {
                           return Promise.reject(new Error(`Sync notebook name is not found. [${syncNotebookName}]`));
                         }
-                        return qconf.createConfigObj(quiverLibPath, hexoRootPath, notebookMetaFiles[selectedIndex], config && typeof config.tagsForSync !== 'undefined' ? config.tagsForSync : ['_sync_', '_blog_']);
+
+                        const tagsForSync = config && config.getTagsForSync() ? config.getTagsForSync() : ['_sync_', '_blog_'];
+                        return qconf.createConfigObj(quiverLibPath, hexoRootPath, notebookMetaFiles[selectedIndex], tagsForSync);
                       })
                       .then((configObj) => {
                         return qconf.writeConfig(configObj);
@@ -68,7 +70,7 @@ command
           .then(confObj => {
             logt.separator(30);
             logt.finish(`Config file was ${config ? 'updated' : 'created'} :)`);
-            logt.info(`path > ${clct.script(qconf._getConfigFilePath())}`);
+            logt.info(`path > ${clct.script(qconf.getConfigFilePath())}`);
             logt.info(`config json > \r\n${clct.script(JSON.stringify(confObj, null, 2))}`);
             logt.separator(30);
           });
@@ -117,7 +119,7 @@ command
               new: clct.new,
               update: clct.update,
               stable: clct.stable
-            }
+            };
 
             results.forEach((result) => {
               var status = result.status;
@@ -174,9 +176,11 @@ command
 function tryLoadConfig() {
   return qconf.loadConfigUnsafety()
     .then((config) => {
+      // FIXME: fact 'exists' is unknown
       return Promise.resolve({exists: true, data: config});
     })
-    .catch((err) => {
+    .catch(() => {
+      // FIXME: fact 'exists' is unknown
       return Promise.resolve({exists: false, data: null});
     });
 }
@@ -206,7 +210,7 @@ function inputQuiverLibPath(config) {
   var question = {
     name: 'quiver',
     description: clct.question(`${clc.bold('Quiver')} library path ${config ? '' : example}`),
-    default: config && typeof config.quiver !== 'undefined' ? config.quiver : undefined,
+    default: config && config.getQuiverLibPath() ? config.getQuiverLibPath() : undefined,
     message: 'Please input quiver lib path',
     type: 'string',
     required: true
@@ -233,7 +237,7 @@ function inputHexoRootPath(config) {
   var question = {
     name: 'hexo',
     description: clct.question(`${clc.bold('Hexo')} root dir path ${config ? '' : example}`),
-    default: config && typeof config.hexo !== 'undefined' ? config.hexo : undefined,
+    default: config && config.getHexoRootPath() ? config.getHexoRootPath() : undefined,
     message: 'Please input hexo root path',
     type: 'string',
     required: true
@@ -275,7 +279,7 @@ function inputSyncNotebookName(config, notebookMetaFiles) {
     name: 'syncNotebook',
     description: clct.question(`Notebook name for syncing to Hexo ${config ? '' : example}`),
     message: 'Please set the notebook name for sync',
-    default: config && typeof config.syncNotebook !== 'undefined' && typeof config.syncNotebook.name !== 'undefined' ? config.syncNotebook.name : undefined,
+    default: config && config.getSyncNotebookName() ? config.getSyncNotebookName() : undefined,
     type: 'string',
     required: true,
     conform: conformFunc

@@ -1,5 +1,4 @@
 import assert from 'power-assert';
-import sinon from 'sinon';
 
 import path from 'path';
 import del from 'del';
@@ -18,27 +17,25 @@ function getConfigJsonStr() {
 const TEST_CONFIG_OBJ = {"quiver":"quiver-path","hexo":"hexo-path","syncNotebook":{"name":"Blog","uuid":"UUID-EXAMPLE"},"tagsForSync":["test","tag","yes"]};
 
 function stubGetConfigFilePath(path) {
-  let stub = sinon.stub(qconfig, '_getConfigFilePath');
-  stub.returns(path);
+  qconfig.__Rewire__('getConfigFilePath', () => path)
 }
 function restoreGetConfigFilePath() {
-  qconfig._getConfigFilePath.restore();
+  qconfig.__ResetDependency__('getConfigFilePath');
 }
 
 function stubExistsConfigFile(result) {
-  let stub = sinon.stub(qconfig, '_existsConfigFile');
-  stub.returns(Promise.resolve(result));
+  qconfig.__Rewire__('_existsConfigFile', () => Promise.resolve(result))
 }
+
 function restoreExistsConfigFile() {
-  qconfig._existsConfigFile.restore();
+  qconfig.__ResetDependency__('_existsConfigFile');
 }
 
 function stubReadJsonConfigFile(json) {
-  let stub = sinon.stub(qconfig, '_readJsonConfigFile');
-  stub.returns(Promise.resolve(json));
+  qconfig.__Rewire__('_readJsonConfigFile', () => Promise.resolve(json))
 }
 function restoreReadJsonConfigFile() {
-  qconfig._readJsonConfigFile.restore();
+  qconfig.__ResetDependency__('_readJsonConfigFile');
 }
 
 describe('QuihexConfig', () => {
@@ -117,11 +114,11 @@ describe('QuihexConfig', () => {
       it('should be valid', () => {
         return qconfig.loadValidatedConfig()
           .then((config) => {
-            assert(config.hexo === TEST_CONFIG_OBJ.hexo);
-            assert(config.quiver === TEST_CONFIG_OBJ.quiver);
-            assert(config.syncNotebook.name === TEST_CONFIG_OBJ.syncNotebook.name);
-            assert(config.syncNotebook.uuid === TEST_CONFIG_OBJ.syncNotebook.uuid);
-            assert(config.tagsForSync === TEST_CONFIG_OBJ.tagsForSync);
+            assert(config.getHexoRootPath() === TEST_CONFIG_OBJ.hexo);
+            assert(config.getQuiverLibPath() === TEST_CONFIG_OBJ.quiver);
+            assert(config.getSyncNotebookName() === TEST_CONFIG_OBJ.syncNotebook.name);
+            assert(config.getSyncNotebookUUID() === TEST_CONFIG_OBJ.syncNotebook.uuid);
+            assert(config.getTagsForSync() === TEST_CONFIG_OBJ.tagsForSync);
           });
       });
     });
@@ -271,4 +268,76 @@ describe('QuihexConfig', () => {
       });
     });
   });
+
+  describe('getConfig', () => {
+    before(() => {
+      stubExistsConfigFile(true);
+      qconfig.__set__('_loadedConfig', null);
+    });
+    after(() => {
+      restoreExistsConfigFile();
+    });
+    context('when call this method before loading config file', () => {
+      it('should get null', () => {
+        assert(qconfig.getConfig() === null);
+      });
+    });
+
+    context('when validation config file is loaded', () => {
+      before(() => {
+        stubReadJsonConfigFile(TEST_CONFIG_OBJ);
+      });
+      after(() => {
+        restoreReadJsonConfigFile();
+      });
+      it('should get loaded config data', () => {
+        return qconfig.loadValidatedConfig()
+          .then(() => {
+            let config = qconfig.getConfig();
+            assert(config.getHexoRootPath() === TEST_CONFIG_OBJ.hexo);
+            assert(config.getQuiverLibPath() === TEST_CONFIG_OBJ.quiver);
+            assert(config.getSyncNotebookName() === TEST_CONFIG_OBJ.syncNotebook.name);
+            assert(config.getSyncNotebookUUID() === TEST_CONFIG_OBJ.syncNotebook.uuid);
+            assert(config.getTagsForSync() === TEST_CONFIG_OBJ.tagsForSync);
+          });
+      });
+    });
+    context('when unsafety config file is loaded', () => {
+      before(() => {
+        stubReadJsonConfigFile({});
+      });
+      after(() => {
+        restoreReadJsonConfigFile();
+      });
+      it('should get loaded config data', () => {
+        return qconfig.loadConfigUnsafety()
+          .then(() => {
+            let config = qconfig.getConfig();
+            assert(config.getHexoRootPath() === null);
+            assert(config.getQuiverLibPath() === null);
+            assert(config.getSyncNotebookName() === null);
+            assert(config.getSyncNotebookUUID() === null);
+            assert(config.getTagsForSync() === null);
+          });
+      });
+    });
+    context('when it is failed to load config file after success to load', () => {
+      before(() => {
+        stubReadJsonConfigFile(TEST_CONFIG_OBJ);
+      });
+      after(() => {
+        restoreReadJsonConfigFile();
+      });
+      it('should reset loaded config data', () => {
+        return qconfig.loadValidatedConfig()
+          .then(() => {
+            stubReadJsonConfigFile({invalid: 'json'});
+            return qconfig.loadValidatedConfig();
+          })
+          .catch(() => {
+            assert(qconfig.getConfig() === null);
+          });
+      });
+    });
+  })
 });
