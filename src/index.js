@@ -5,7 +5,7 @@ import prompt from 'prompt';
 import command from 'commander';
 import clc from 'cli-color';
 
-import {createCore} from './quihex-core';
+import Qcore from './quihex-core';
 import qconf from './quihex-config';
 import qvUtil from './utils/quiver-util';
 import hexoUtil from './utils/hexo-util';
@@ -36,7 +36,7 @@ command
   .description('Initialize or update quihex config')
   .action(() => {
     tryLoadConfig()
-      .then((tryConfig) => {
+      .then(async tryConfig => {
         var config = tryConfig.exists ? tryConfig.data : null;
         if (config) {
           logt.separator(30, '=');
@@ -44,38 +44,28 @@ command
           logt.info('If you don\'t need to update config, Press enter with nothing.');
           logt.separator(30, '=');
         }
-        return inputQuiverLibPath(config)
-          .then((quiverLibPath) => {
-            return inputHexoRootPath(config)
-              .then((hexoRootPath) => {
-                return qvUtil.getAllNotebookMetaFiles(quiverLibPath)
-                  .then((notebookMetaFiles) => {
-                    return inputSyncNotebookName(config, notebookMetaFiles)
-                      .then((syncNotebookName) => {
-                        // Mt. Fuji 🗻🗻🗻
-                        var selectedIndex = notebookMetaFiles.map((meta) => {
-                          return meta.name
-                        }).indexOf(syncNotebookName);
-                        if (selectedIndex === -1) {
-                          return Promise.reject(new Error(`Sync notebook name is not found. [${syncNotebookName}]`));
-                        }
 
-                        const tagsForSync = config && config.getTagsForSync() ? config.getTagsForSync() : ['_sync_', '_blog_'];
-                        return qconf.createConfigObj(quiverLibPath, hexoRootPath, notebookMetaFiles[selectedIndex], tagsForSync);
-                      })
-                      .then((configObj) => {
-                        return qconf.writeConfig(configObj);
-                      });
-                  });
-              })
-          })
-          .then(confObj => {
-            logt.separator(30);
-            logt.finish(`Config file was ${config ? 'updated' : 'created'} :)`);
-            logt.info(`path > ${clct.script(qconf.getConfigFilePath())}`);
-            logt.info(`config json > \r\n${clct.script(JSON.stringify(confObj, null, 2))}`);
-            logt.separator(30);
-          });
+        const typedQuiverLibPath = await inputQuiverLibPath(config);
+        const typedHexoRootPath = await inputHexoRootPath(config);
+
+        const allNotebookMetaFiles = await qvUtil.getAllNotebookMetaFiles(typedQuiverLibPath);
+        const typedSyncNotebookName = await inputSyncNotebookName(config, allNotebookMetaFiles);
+
+        let selectedNotebook = allNotebookMetaFiles.filter(meta => meta.name === typedSyncNotebookName);
+        selectedNotebook = selectedNotebook.length === 0 ? null : selectedNotebook[0];
+        if (selectedNotebook === null) {
+          return Promise.reject(new Error(`Sync notebook name is not found. [${typedSyncNotebookName}]`));
+        }
+
+        const tagsForSync = config && config.getTagsForSync() ? config.getTagsForSync() : ['_sync_', '_blog_'];
+        const configObj = await qconf.createConfigObj(typedQuiverLibPath, typedHexoRootPath, selectedNotebook, tagsForSync);
+
+        await qconf.writeConfig(configObj);
+        logt.separator(30);
+        logt.info(`path > ${clct.script(qconf.getConfigFilePath())}`);
+        logt.info(`config json > \r\n${clct.script(JSON.stringify(configObj, null, 2))}`);
+        logt.separator(30);
+        logt.finish(`Config file was ${config ? 'updated 🎉' : 'created 🚀'}`);
       })
       .catch((err) => {
         onError(err);
@@ -88,7 +78,7 @@ command
   .action(() => {
     qconf.loadValidatedConfig()
       .then((config) => {
-        const qcore = createCore(config);
+        const qcore = Qcore.createCore(config);
         return qcore.getUserNotebookNames();
       })
       .then((notebookNames) => {
@@ -112,7 +102,7 @@ command
 
     qconf.loadValidatedConfig()
       .then((config) => {
-        const qcore = createCore(config);
+        const qcore = Qcore.createCore(config);
         return qcore.getAllBlogStatus()
           .then((results) => {
             var statusColor = {
