@@ -8,11 +8,23 @@ import fs from 'fs';
 import pathExists from 'path-exists';
 import getHomePath from 'home-path';
 
-import qcore from '../src/quihex-core';
+import Qcore from '../src/quihex-core';
+import qconfig from '../src/quihex-config';
 import quiverUtil from '../src/utils/quiver-util';
 
-describe('QuihexCore', () => {
+async function createConfigAsync(configJson) {
+  qconfig.__Rewire__('_existsConfigFile', () => Promise.resolve(true));
+  qconfig.__Rewire__('_readJsonConfigFile', () => Promise.resolve(configJson))
 
+  const conf = await qconfig.loadConfigUnsafety();
+
+  qconfig.__ResetDependency__('_existsConfigFile');
+  qconfig.__ResetDependency__('_readJsonConfigFile');
+
+  return conf;
+}
+
+describe('QuihexCore', () => {
   describe('getUserNotebookNames(config)', () => {
     context('when user notebooks exist', () => {
       before(() => {
@@ -22,15 +34,18 @@ describe('QuihexCore', () => {
         ];
         stub.withArgs('quiver-path').returns(Promise.resolve(metaFiles));
       });
-      it('should get notebook names', () => {
-        return qcore.getUserNotebookNames({quiver:'quiver-path'})
+      after(() => {
+        quiverUtil.getAllNotebookMetaFiles.restore();
+      });
+      it('should get notebook names', async () => {
+        const config = await createConfigAsync({quiver:'quiver-path'});
+        const qcore = Qcore.createCore(config);
+
+        return qcore.getUserNotebookNames()
           .then((names) => {
             assert(names[0] === 'blog');
             assert(names[1] === 'test');
           });
-      });
-      after(() => {
-        quiverUtil.getAllNotebookMetaFiles.restore();
       });
     });
     context('when user notebooks do not exist', () => {
@@ -39,103 +54,74 @@ describe('QuihexCore', () => {
         var metaFiles = [];
         stub.withArgs('quiver-path').returns(Promise.resolve(metaFiles));
       });
-      it('should catch error', () => {
-        return qcore.getUserNotebookNames({quiver:'quiver-path'})
+      after(() => {
+        quiverUtil.getAllNotebookMetaFiles.restore();
+      });
+      it('should catch error', async () => {
+        const config = await createConfigAsync({quiver:'quiver-path'});
+        const qcore = Qcore.createCore(config);
+
+        return qcore.getUserNotebookNames()
           .catch((err) => {
             assert(err.name === 'Error');
             assert(err.message === 'Please create one or more your notebooks.');
           });
       });
-      after(() => {
-        quiverUtil.getAllNotebookMetaFiles.restore();
-      });
     });
   });
 
-  describe('getSyncNoteFilePaths(quihexConfig)', () => {
+  describe('getSyncNoteFilePaths()', () => {
     context('when user notes exist', () => {
       before(() => {
-        let stub = sinon.stub(qcore, '_getSyncNotebookPath');
-        stub.withArgs({test: 'hoge'}).returns(Promise.resolve('test_path'));
-        let stub2 = sinon.stub(quiverUtil, 'getNotePaths');
+        let stub = sinon.stub(quiverUtil, 'getNotePaths');
         var notePaths = ['sample1.qvnote', 'sample2.qvnote', 'sample3.qvnote'];
-        stub2.withArgs('test_path').returns(Promise.resolve(notePaths));
-      });
-      it('should get note paths', () => {
-        return qcore.getSyncNoteFilePaths({test: 'hoge'})
-          .then((paths) => {
-            assert(paths[0] === 'sample1.qvnote');
-            assert(paths[1] === 'sample2.qvnote');
-            assert(paths[2] === 'sample3.qvnote');
-          });
+        stub.withArgs('quiver_path/sample_uuid.qvnotebook').returns(Promise.resolve(notePaths));
       });
       after(() => {
-        qcore._getSyncNotebookPath.restore();
         quiverUtil.getNotePaths.restore();
+      });
+      it('should get note paths', async () => {
+        const config = await createConfigAsync({quiver: 'quiver_path', syncNotebook: {uuid:'sample_uuid'}});
+        const qcore = Qcore.createCore(config);
+
+        const paths = await qcore.getSyncNoteFilePaths();
+        assert(paths[0] === 'sample1.qvnote');
+        assert(paths[1] === 'sample2.qvnote');
+        assert(paths[2] === 'sample3.qvnote');
       });
     });
     context('when there are no user notes', () => {
       before(() => {
-        let stub = sinon.stub(qcore, '_getSyncNotebookPath');
-        stub.withArgs({test: 'fuga'}).returns(Promise.resolve('test_path'));
-        let stub2 = sinon.stub(quiverUtil, 'getNotePaths');
-        stub2.withArgs('test_path').returns(Promise.resolve([]));
-      });
-      it('should get note paths', () => {
-        return qcore.getSyncNoteFilePaths({test: 'fuga'})
-          .then((paths) => {
-            assert(paths.length === 0);
-          });
+        let stub = sinon.stub(quiverUtil, 'getNotePaths');
+        stub.withArgs('quiver_path/sample_uuid.qvnotebook').returns(Promise.resolve([]));
       });
       after(() => {
-        qcore._getSyncNotebookPath.restore();
         quiverUtil.getNotePaths.restore();
+      });
+      it('should get note paths', async () => {
+        const config = await createConfigAsync({quiver: 'quiver_path', syncNotebook: {uuid:'sample_uuid'}});
+        const qcore = Qcore.createCore(config);
+
+        const paths = await qcore.getSyncNoteFilePaths();
+        assert(paths.length === 0);
       });
     });
     context('when user notes and un-note files exist', () => {
       before(() => {
-        let stub = sinon.stub(qcore, '_getSyncNotebookPath');
-        stub.withArgs({test: 'fuga'}).returns(Promise.resolve('test_path'));
-        let stub2 = sinon.stub(quiverUtil, 'getNotePaths');
-        stub2.withArgs('test_path').returns(Promise.resolve(['sample2.txt', 'sample1.qvnote']));
-      });
-      it('should get only note paths', () => {
-        return qcore.getSyncNoteFilePaths({test: 'fuga'})
-          .then((paths) => {
-            assert(paths.length === 1);
-            assert(paths[0] === 'sample1.qvnote');
-          });
+        let stub = sinon.stub(quiverUtil, 'getNotePaths');
+        stub.withArgs('quiver_path/sample_uuid.qvnotebook').returns(Promise.resolve(['sample2.txt', 'sample1.qvnote', 'sample3.java']));
       });
       after(() => {
-        qcore._getSyncNotebookPath.restore();
         quiverUtil.getNotePaths.restore();
       });
-    });
-  });
+      it('should get only note paths', async () => {
+        const config = await createConfigAsync({quiver: 'quiver_path', syncNotebook: {uuid:'sample_uuid'}});
+        const qcore = Qcore.createCore(config);
 
-
-  describe('_getSyncNotebookPath(quihexConfig)', () => {
-    context('when config obj has necessary fields', () => {
-      it('should get notebook path', () => {
-        var data = {
-          quiver: '/Users/me/quiver.qvlibrary',
-          syncNotebook: { uuid: 'TEST-UUID' }
-        };
-        return qcore._getSyncNotebookPath(data)
-          .then((path) => {
-            assert(path === '/Users/me/quiver.qvlibrary/TEST-UUID.qvnotebook');
-          });
-      });
-    });
-    context('when config obj is invalid', () => {
-      it('should catch error', () => {
-        return qcore._getSyncNotebookPath(null)
-          .catch((err) => {
-            assert(err.name === 'TypeError');
-            assert(err.message === 'Cannot read property \'quiver\' of null');
-          });
+        const paths = await qcore.getSyncNoteFilePaths();
+        assert(paths.length === 1);
+        assert(paths[0] === 'sample1.qvnote');
       });
     });
   });
-
 });

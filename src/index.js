@@ -5,8 +5,10 @@ import prompt from 'prompt';
 import command from 'commander';
 import clc from 'cli-color';
 
-import qcore from './quihex-core';
+import {createCore} from './quihex-core';
 import qconf from './quihex-config';
+import qvUtil from './utils/quiver-util';
+import hexoUtil from './utils/hexo-util';
 
 import logt from './utils/log-template';
 import clct from './utils/cli-color-template';
@@ -46,7 +48,7 @@ command
           .then((quiverLibPath) => {
             return inputHexoRootPath(config)
               .then((hexoRootPath) => {
-                return qcore.getAllNotebookMetaFiles(quiverLibPath)
+                return qvUtil.getAllNotebookMetaFiles(quiverLibPath)
                   .then((notebookMetaFiles) => {
                     return inputSyncNotebookName(config, notebookMetaFiles)
                       .then((syncNotebookName) => {
@@ -86,7 +88,8 @@ command
   .action(() => {
     qconf.loadValidatedConfig()
       .then((config) => {
-        return qcore.getUserNotebookNames(config);
+        const qcore = createCore(config);
+        return qcore.getUserNotebookNames();
       })
       .then((notebookNames) => {
         notebookNames.map((nb) => {
@@ -109,10 +112,8 @@ command
 
     qconf.loadValidatedConfig()
       .then((config) => {
-        return qcore.getSyncNoteFilePaths(config)
-          .then((notePaths) => {
-            return qcore.getAllBlogStatus(config, notePaths);
-          })
+        const qcore = createCore(config);
+        return qcore.getAllBlogStatus()
           .then((results) => {
             var statusColor = {
               skip: clct.skip,
@@ -153,7 +154,7 @@ command
                 logt.info('Sync start...');
                 return Promise.all(
                   syncTargetPosts.map((post) => {
-                    return qcore.writeAsHexoPosts(config, post)
+                    return qcore.writeAsHexoPosts(post)
                       .then((result) => {
                         logt.info(`Success [${post.filename}]`)
                       });
@@ -206,11 +207,10 @@ function inputYesNoConform(description) {
 
 function inputQuiverLibPath(config) {
   var example = _ex('/Users/you/Library/Quiver.qvlibrary');
-
   var question = {
     name: 'quiver',
     description: clct.question(`${clc.bold('Quiver')} library path ${config ? '' : example}`),
-    default: config && config.getQuiverLibPath() ? config.getQuiverLibPath() : undefined,
+    default: config && config.getQuiverLibPath() !== null ? config.getQuiverLibPath() : undefined,
     message: 'Please input quiver lib path',
     type: 'string',
     required: true
@@ -219,7 +219,7 @@ function inputQuiverLibPath(config) {
   return input(question)
     .then((answer) => {
       var quiverLibPath = answer.quiver.trim();
-      return qcore.validQuiverLib(quiverLibPath)
+      return qvUtil.validQuiverLib(quiverLibPath)
         .then(() => {
           return Promise.resolve(quiverLibPath)
         })
@@ -237,7 +237,7 @@ function inputHexoRootPath(config) {
   var question = {
     name: 'hexo',
     description: clct.question(`${clc.bold('Hexo')} root dir path ${config ? '' : example}`),
-    default: config && config.getHexoRootPath() ? config.getHexoRootPath() : undefined,
+    default: config && config.getHexoRootPath() !== null ? config.getHexoRootPath() : undefined,
     message: 'Please input hexo root path',
     type: 'string',
     required: true
@@ -246,7 +246,7 @@ function inputHexoRootPath(config) {
   return input(question)
     .then((answer) => {
       var hexoRootPath = answer.hexo.trim();
-      return qcore.validHexoRoot(hexoRootPath)
+      return hexoUtil.validHexoRoot(hexoRootPath)
         .then(() => {
           return Promise.resolve(hexoRootPath)
         })
@@ -279,7 +279,7 @@ function inputSyncNotebookName(config, notebookMetaFiles) {
     name: 'syncNotebook',
     description: clct.question(`Notebook name for syncing to Hexo ${config ? '' : example}`),
     message: 'Please set the notebook name for sync',
-    default: config && config.getSyncNotebookName() ? config.getSyncNotebookName() : undefined,
+    default: config && config.getSyncNotebookName() !== null ? config.getSyncNotebookName() : undefined,
     type: 'string',
     required: true,
     conform: conformFunc

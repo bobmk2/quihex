@@ -1,6 +1,12 @@
 {
-    "presets": ["es2015", "stage-2"],
-    "plugins": ["babel-plugin-rewire"],
+    "presets": ["es2015", "stage-3"],
+    "plugins": [
+        "babel-plugin-rewire",
+        ["transform-runtime", {
+            "polyfill": false,
+            "regenerator": true
+        }]
+    ],
     "env": {
         "development": {
           "presets": [

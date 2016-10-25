@@ -1,112 +1,117 @@
 import path from 'path'
 import pathExists from 'path-exists';
 
-import quiverUtil from './utils/quiver-util'
-import fileUtil from './utils/file-util'
+import quiverUtil from './utils/quiver-util';
+import fileUtil from './utils/file-util';
 import hexoUtil from './utils/hexo-util';
+import arrUtil from './utils/array-util';
 
 class QuihexCore {
 
-  validQuiverLib(quiverLibPath) {
-    return quiverUtil.validQuiverLib(quiverLibPath);
+  constructor(quihexConfig) {
+    this.quihexConfig = quihexConfig;
   }
 
-  validHexoRoot(hexoRootPath) {
-    return hexoUtil.validHexoRoot(hexoRootPath);
+  /**
+   * Use in 'ls-notebook'
+   * return all notebook names
+   *
+   * @returns {Promise.<[String]>} notebook names
+   */
+  async getUserNotebookNames() {
+    const quiverLibPath = this.quihexConfig.getQuiverLibPath();
+
+    const metaFiles = await quiverUtil.getAllNotebookMetaFiles(quiverLibPath);
+    if (metaFiles.length === 0) {
+      return Promise.reject(new Error('Please create one or more your notebooks.'));
+    }
+
+    return metaFiles.map((notebooks) => notebooks.name);
   }
 
-  getAllNotebookMetaFiles(quiverLibPath) {
-    return quiverUtil.getAllNotebookMetaFiles(quiverLibPath);
-  }
+  /**
+   * Use in 'sync'
+   * return 'all' note paths in the notebook, it is sync target note or not.
+   *
+   * @returns {Promise.<[String]>} path array of note files
+   */
+  async getSyncNoteFilePaths() {
+    const quiverLibPath = this.quihexConfig.getQuiverLibPath();
+    const syncNotebookUUID = this.quihexConfig.getSyncNotebookUUID();
 
-  getUserNotebookNames(config) {
-    return quiverUtil.getAllNotebookMetaFiles(config.quiver)
-      .then((notebooks) => {
-        if (notebooks.length === 0) {
-          return Promise.reject(new Error('Please create one or more your notebooks.'));
-        }
-        return Promise.resolve(notebooks.map((notebooks) => notebooks.name));
-      });
-  }
+    const notebookPath = path.join(quiverLibPath, `${syncNotebookUUID}.qvnotebook`)
+    const notePaths = await quiverUtil.getNotePaths(notebookPath);
 
-  getSyncNoteFilePaths(quihexConfig) {
-    return this._getSyncNotebookPath(quihexConfig)
-      .then((syncNotebookPath) => {
-        return quiverUtil.getNotePaths(syncNotebookPath);
-      })
-      .then((paths) => {
-        return Promise.resolve(
-          paths.filter((filepath) => {
-            return path.extname(filepath) === '.qvnote'
-          }));
-      });
-  }
-
-  _getSyncNotebookPath(quihexConfig) {
-    return new Promise((resolve) => {
-      resolve(path.join(quihexConfig.quiver, quihexConfig.syncNotebook.uuid + '.qvnotebook'));
+    return notePaths.filter(filepath => {
+      return path.extname(filepath) === '.qvnote'
     });
-  }
+ }
 
-  getAllBlogStatus(config, notePaths) {
+  async getAllBlogStatus() {
+    const notePaths = await this.getSyncNoteFilePaths();
+
     return Promise.all(
-      notePaths.map((notePath) => {
-        return quiverUtil.loadNoteFile(notePath)
-          .then((note) => {
-            return quiverUtil.convertToHexoPostObj(note)
-          })
-          .then((hexoPostObj) => {
-            return this._getBlogStatus(config, hexoPostObj)
-          })
-      })
+      notePaths.map(path => this._getBlogStatusEx(path))
     );
   }
 
-  writeAsHexoPosts(config, hexoPostObj) {
-    return hexoUtil.loadHexoConfig(config.hexo)
-      .then((hexoConfig) => {
-        var postsRoot = path.join(config.hexo, hexoConfig.source_dir, '_posts');
-        var filePath = path.join(postsRoot, `${hexoPostObj.filename}.md`);
+  async writeAsHexoPosts(hexoPostObj) {
+    const hexoRootPath = this.quihexConfig.getHexoRootPath();
+    const hexoConfig = hexoUtil.loadHexoConfig(hexoRootPath);
 
-        return fileUtil.writeFilePromise(filePath, hexoUtil.toHexoPostString(hexoPostObj), 'utf-8');
-      });
+    const postsRoot = path.join(hexoRootPath, hexoConfig.source_dir, '_posts');
+    const filePath = path.join(postsRoot, `${hexoPostObj.filename}.md`);
+
+    const hexoPostString = await hexoUtil.toHexoPostString(hexoPostObj);
+    return fileUtil.writeFilePromise(filePath, hexoPostString, 'utf-8');
   }
 
-  _getBlogStatus(quihexConfig, hexoPostObj) {
-    return hexoUtil.loadHexoConfig(quihexConfig.hexo)
-      .then((hexoConfig) => {
+  async _getBlogStatusEx(notePath) {
+    const hexoRootPath = this.quihexConfig.getHexoRootPath();
+    const tagsForSync = this.quihexConfig.getTagsForSync();
 
-        var postsRoot = path.join(quihexConfig.hexo, hexoConfig.source_dir, '_posts');
-        var lastFilePath = path.join(postsRoot, `${hexoPostObj.filename}.md`);
+    const noteFile = await quiverUtil.loadNoteFile(notePath);
+    const hexoPostObj = await quiverUtil.convertToHexoPostObj(noteFile);
 
-        var createStatus = (status) => {
-          return {
-            hexoPostObj: hexoPostObj,
-            status: status
-          }
-        }
+    const hexoConfig = await hexoUtil.loadHexoConfig(hexoRootPath);
 
-        // if quihex note dose'nt have sync tag, skip sync it.
-        if (Array.from(new Set(hexoPostObj.tags.concat(quihexConfig.tagsForSync)))) {
-          return Promise.resolve(createStatus('skip'));
-        }
+    // FIXME: maybe return class instance
+    const createStatus = status => {
+      return {
+        hexoPostObj: hexoPostObj,
+        status: status
+      }
+    };
 
-        return pathExists(lastFilePath)
-          .then((exists) => {
+    // if quihex note dose'nt have sync tag, skip sync it.
+    if (arrUtil.extractDuplicateItems(hexoPostObj.tags.concat(tagsForSync)).length === 0) {
+      return createStatus('skip');
+    }
 
-            // it is new if last file is not found
-            if (!exists) {
-              return Promise.resolve(createStatus('new'));
-            }
+    const postsRoot = path.join(hexoRootPath, hexoConfig.source_dir, '_posts');
+    const latestHexoBlogPath = path.join(postsRoot, `${hexoPostObj.filename}.md`);
+    const existsLatestFile = await pathExists(latestHexoBlogPath);
 
-            return fileUtil.readFilePromise(lastFilePath)
-              .then((lastPosts) => {
-                var isEqual = lastPosts === hexoUtil.toHexoPostString(hexoPostObj);
-                return Promise.resolve(createStatus(isEqual ? 'stable' : 'update'));
-              });
-          })
-      });
+    // set new status if last file is not-found
+    if (!existsLatestFile) {
+      return createStatus('new');
+    }
+
+    const latestHexoBlogFile = await fileUtil.readFilePromise(latestHexoBlogPath);
+    const isEqual = latestHexoBlogFile === hexoUtil.toHexoPostString(hexoPostObj);
+    return createStatus(isEqual ? 'stable' : 'update');
   }
 }
 
-export default new QuihexCore();
+/**
+ * FIXME: load config in this class when methods are called
+ * @param quihexConfig loaded config data
+ * @returns {QuihexCore} core instance
+ */
+function createCore(quihexConfig) {
+  return new QuihexCore(quihexConfig);
+}
+
+export default {
+  createCore
+};
